@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DbModule } from '@/shared/db/db.module';
 import { HealthModule } from '@/modules/health/health.module';
 import { AuthModule } from '@/modules/auth/auth.module';
 import { WalletModule } from '@/modules/wallet/wallet.module';
@@ -11,6 +12,6 @@ import { GameModule } from '@/modules/game/game.module';
  *  onchain-listener added as they gain real logic.)
  */
 @Module({
-  imports: [HealthModule, AuthModule, WalletModule, ProvablyFairModule, GameModule],
+  imports: [DbModule, HealthModule, AuthModule, WalletModule, ProvablyFairModule, GameModule],
 })
 export class AppModule {}

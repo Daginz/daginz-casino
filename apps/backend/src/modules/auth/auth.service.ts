@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { randomBytes } from 'node:crypto';
+import { Inject, Injectable } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { SiweMessage } from 'siwe';
 import type { PlayerId, WalletAddress } from '@casino/contracts';
-import { asPlayerId } from '@casino/contracts';
+import { asWalletAddress } from '@casino/contracts';
 import type {
   AuthSession,
   IAuthService,
@@ -9,31 +10,67 @@ import type {
   SiweChallenge,
   SiweVerification,
 } from '@/contracts/auth.contract';
+import {
+  PLAYER_DATA_PROVIDER,
+  type IPlayerDataProvider,
+} from '@/contracts/data-providers/player-data-provider.contract';
 import { err, ok, type Result } from '@/shared/result';
-import { DomainError, EntityNotFoundError } from '@/shared/errors/domain-error';
+import {
+  DomainError,
+  EntityNotFoundError,
+  UnauthorizedError,
+} from '@/shared/errors/domain-error';
+import { NonceStore } from './nonce.store';
+
+interface JwtPayload {
+  sub: string;
+  address: string;
+}
 
 /**
- * SIWE auth — STUB (Block C). Real signature verification, nonce storage and
- * JWT issuance arrive in Block D. Shapes match the contract so endpoints wire.
+ * SIWE (EIP-4361) authentication. Verifies the signed message against an
+ * issued nonce, upserts the player, and signs a JWT. Real crypto — no stubs.
  */
 @Injectable()
 export class AuthService implements IAuthService {
+  constructor(
+    @Inject(PLAYER_DATA_PROVIDER) private readonly players: IPlayerDataProvider,
+    private readonly nonces: NonceStore,
+    private readonly jwt: JwtService,
+  ) {}
+
   async createChallenge(_address: WalletAddress): Promise<SiweChallenge> {
-    return { nonce: randomBytes(16).toString('hex'), issuedAt: new Date() };
+    const { nonce, issuedAt } = this.nonces.issue();
+    return { nonce, issuedAt };
   }
 
-  async verify(_input: SiweVerification): Promise<Result<AuthSession, DomainError>> {
-    // TODO(Block D): verify signature against nonce, upsert player, sign JWT.
-    const player: Player = {
-      id: asPlayerId('stub-player'),
-      walletAddress: '0x0000000000000000000000000000000000000000' as WalletAddress,
-      createdAt: new Date(),
-    };
-    return ok({ player, accessToken: 'stub-jwt' });
+  async verify(input: SiweVerification): Promise<Result<AuthSession, DomainError>> {
+    let fields;
+    try {
+      const message = new SiweMessage(input.message);
+      fields = await message.verify({ signature: input.signature });
+    } catch {
+      return err(new UnauthorizedError('Invalid SIWE signature'));
+    }
+
+    const { nonce, address } = fields.data;
+    if (!this.nonces.consume(nonce)) {
+      return err(new UnauthorizedError('Invalid or expired nonce'));
+    }
+
+    const player = await this.players.upsertByAddress(asWalletAddress(address.toLowerCase()));
+    const accessToken = await this.signToken(player);
+    return ok({ player, accessToken });
   }
 
   async getPlayer(id: PlayerId): Promise<Result<Player, DomainError>> {
-    // TODO(Block D): load from Postgres.
-    return err(new EntityNotFoundError(`Player ${id} not found (stub)`));
+    const player = await this.players.findById(id);
+    if (!player) return err(new EntityNotFoundError(`Player ${id} not found`));
+    return ok(player);
+  }
+
+  private async signToken(player: Player): Promise<string> {
+    const payload: JwtPayload = { sub: player.id, address: player.walletAddress };
+    return this.jwt.signAsync(payload);
   }
 }
