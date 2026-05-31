@@ -5,9 +5,10 @@ import "os"
 
 // Config holds runtime configuration for the wallet service.
 type Config struct {
-	Port string
-	// DatabaseURL is consumed by the ledger store in Block D.
+	Port        string
 	DatabaseURL string
+	// Store selects the ledger backend: "postgres" (default) or "memory".
+	Store string
 }
 
 // Load reads configuration from environment variables with sane defaults.
@@ -15,6 +16,7 @@ func Load() Config {
 	return Config{
 		Port:        getenv("WALLET_PORT", "4100"),
 		DatabaseURL: getenv("DATABASE_URL", "postgres://casino:casino@localhost:5432/casino"),
+		Store:       getenv("WALLET_STORE", "postgres"),
 	}
 }
 

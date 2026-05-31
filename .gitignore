@@ -12,6 +12,8 @@ out/
 # go
 apps/wallet/bin/
 apps/wallet/tmp/
+apps/wallet/*.out.log
+apps/wallet/*.err.log
 
 # env
 .env
