@@ -1,26 +1,23 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsObject, IsString, Matches } from 'class-validator';
-// NOTE: all SIWE/game/PF DTOs need class-validator decorators — the global
-// ValidationPipe runs forbidNonWhitelisted, so any undecorated field => 400.
+import { IsObject, IsOptional, IsString, Matches } from 'class-validator';
+// NOTE: all DTOs need class-validator decorators — the global ValidationPipe
+// runs forbidNonWhitelisted, so any undecorated field => 400.
 
 export class PlaceBetDto {
-  @ApiProperty({ enum: ['dice', 'crash', 'slot'], example: 'dice' })
-  @IsIn(['dice', 'crash', 'slot'])
-  game!: 'dice' | 'crash' | 'slot';
+  @ApiProperty({ example: 'slot-classic-3x3', description: 'Registered game id' })
+  @IsString()
+  gameId!: string;
 
   @ApiProperty({ example: '100', description: 'Stake in minor units (testnet credits)' })
   @IsString()
-  @Matches(/^\d+$/, { message: 'amount must be a non-negative integer string' })
-  amount!: string;
-
-  @ApiProperty({ example: 'player-chosen-seed' })
-  @IsString()
-  clientSeed!: string;
+  @Matches(/^\d+$/, { message: 'stake must be a non-negative integer string' })
+  stake!: string;
 
   @ApiProperty({
-    example: { target: 50 },
-    description: 'Game-specific params (e.g. dice target 0-99)',
+    example: {},
+    description: 'Game-specific params (validated by the game definition)',
   })
   @IsObject()
-  params!: Record<string, number>;
+  @IsOptional()
+  params: Record<string, unknown> = {};
 }

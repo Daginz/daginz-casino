@@ -18,8 +18,8 @@ export const envSchema = z.object({
   SIWE_DOMAIN: z.string().default('localhost:3000'),
   SIWE_STATEMENT: z.string().default('Sign in to Casino (testnet)'),
 
-  // Wallet (Go) service location — used once Game Engine calls it
-  WALLET_PORT: z.coerce.number().int().positive().default(4100),
+  // Wallet (Go) service base URL — the backend calls it for ledger ops.
+  WALLET_URL: z.string().url().default('http://localhost:4100'),
 });
 
 export type Env = z.infer<typeof envSchema>;

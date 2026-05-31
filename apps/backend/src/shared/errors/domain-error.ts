@@ -38,3 +38,8 @@ export class UnauthorizedError extends DomainError {
   readonly code = 'UNAUTHORIZED';
   readonly httpStatus = HttpStatus.UNAUTHORIZED;
 }
+
+export class ExternalServiceError extends DomainError {
+  readonly code = 'EXTERNAL_SERVICE_ERROR';
+  readonly httpStatus = HttpStatus.BAD_GATEWAY;
+}

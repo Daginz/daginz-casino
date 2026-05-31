@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { createHash, createHmac, randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import type { PlayerId } from '@casino/contracts';
 import type {
   ActiveCommitment,
@@ -14,13 +14,15 @@ import {
 } from '@/contracts/data-providers/seed-data-provider.contract';
 import { err, ok, type Result } from '@/shared/result';
 import { DomainError, EntityNotFoundError } from '@/shared/errors/domain-error';
+import { deriveRoundSeed, roundOutcome } from './fair-math';
 
 /**
- * Provably-fair commit-reveal. The outcome of a round is fully determined by
+ * Provably-fair commit-reveal. A round is fully determined by
  * (serverSeed, clientSeed, nonce); the serverSeed hash is committed before
  * play and the seed revealed after, so any player can verify fairness.
  *
- * Shared by every game: a game never rolls its own RNG.
+ * Shared by every game: a game never rolls its own RNG. Games seed their
+ * RoundRng from the per-round `roundSeed` returned by draw().
  */
 @Injectable()
 export class ProvablyFairService implements IProvablyFairService {
@@ -36,9 +38,10 @@ export class ProvablyFairService implements IProvablyFairService {
     const drawn = await this.seeds.drawNonce(playerId);
     if (!drawn) return err(new EntityNotFoundError('No active seed to draw from'));
 
-    const outcome = this.hmacOutcome(drawn.serverSeed, drawn.clientSeed, drawn.nonce);
+    const roundSeed = deriveRoundSeed(drawn.serverSeed, drawn.clientSeed, drawn.nonce);
     return ok({
-      outcome,
+      outcome: roundOutcome(roundSeed),
+      roundSeed,
       serverSeedHash: drawn.serverSeedHash,
       clientSeed: drawn.clientSeed,
       nonce: drawn.nonce,
@@ -69,14 +72,13 @@ export class ProvablyFairService implements IProvablyFairService {
   verify(revealed: RevealedSeed, claimedOutcome: number): boolean {
     const hash = createHash('sha256').update(revealed.serverSeed).digest('hex');
     if (hash !== revealed.serverSeedHash) return false;
-    const recomputed = this.hmacOutcome(revealed.serverSeed, revealed.clientSeed, revealed.nonce);
-    return Math.abs(recomputed - claimedOutcome) < 1e-12;
+    const roundSeed = deriveRoundSeed(revealed.serverSeed, revealed.clientSeed, revealed.nonce);
+    return Math.abs(roundOutcome(roundSeed) - claimedOutcome) < 1e-12;
   }
 
   private async ensureActive(playerId: PlayerId): Promise<SeedPair> {
     const existing = await this.seeds.findActive(playerId);
     if (existing) return existing;
-    // Default client seed if the player hasn't chosen one.
     return this.createSeed(playerId, randomBytes(8).toString('hex'));
   }
 
@@ -84,13 +86,5 @@ export class ProvablyFairService implements IProvablyFairService {
     const serverSeed = randomBytes(32).toString('hex');
     const serverSeedHash = createHash('sha256').update(serverSeed).digest('hex');
     return this.seeds.createActive({ playerId, serverSeed, serverSeedHash, clientSeed });
-  }
-
-  private hmacOutcome(serverSeed: string, clientSeed: string, nonce: number): number {
-    const digest = createHmac('sha256', serverSeed)
-      .update(`${clientSeed}:${nonce}`)
-      .digest('hex');
-    // First 13 hex chars → 52 bits → uniform float in [0, 1).
-    return parseInt(digest.slice(0, 13), 16) / 2 ** 52;
   }
 }

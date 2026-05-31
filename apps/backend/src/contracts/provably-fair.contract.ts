@@ -21,6 +21,13 @@ export interface ActiveCommitment {
 export interface FairDraw {
   /** Float in [0, 1) derived from HMAC(serverSeed, `${clientSeed}:${nonce}`). */
   outcome: number;
+  /**
+   * Per-round secret seed = HMAC(serverSeed, `${clientSeed}:${nonce}`).
+   * Derived from the hidden server seed, so it can't be predicted from the
+   * published hash; games seed their RNG stream from this. After reveal,
+   * anyone can recompute it from (serverSeed, clientSeed, nonce) to verify.
+   */
+  roundSeed: string;
   serverSeedHash: string;
   clientSeed: string;
   nonce: number;

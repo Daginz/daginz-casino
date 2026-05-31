@@ -8,7 +8,11 @@ import type { Pool } from 'pg';
  * The wallet (Go) owns ledger migrations; the backend owns the rest.
  * We scope by an allowlist so the two services don't fight over files.
  */
-const BACKEND_MIGRATIONS = ['0002_players.sql', '0003_provably_fair_seeds.sql'];
+const BACKEND_MIGRATIONS = [
+  '0002_players.sql',
+  '0003_provably_fair_seeds.sql',
+  '0004_game_rounds.sql',
+];
 
 export async function runMigrations(pool: Pool, migrationsDir: string): Promise<void> {
   await pool.query(`

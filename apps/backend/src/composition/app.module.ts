@@ -7,9 +7,7 @@ import { ProvablyFairModule } from '@/modules/provably-fair/provably-fair.module
 import { GameModule } from '@/modules/game/game.module';
 
 /**
- * Root assembly. As feature modules come online they register here.
- * (Block C: auth, wallet-port, provably-fair, game. Bonus/CRM/Risk/Reporting/
- *  onchain-listener added as they gain real logic.)
+ * Root assembly. Feature modules register here as they come online.
  */
 @Module({
   imports: [DbModule, HealthModule, AuthModule, WalletModule, ProvablyFairModule, GameModule],
