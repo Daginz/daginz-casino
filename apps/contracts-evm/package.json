@@ -1,0 +1,21 @@
+{
+  "name": "@casino/contracts-evm",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Casino EVM contracts: CHIP ERC-20 + faucet + escrow (Hardhat)",
+  "scripts": {
+    "build": "hardhat compile",
+    "test": "hardhat test",
+    "node": "hardhat node",
+    "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.0",
+    "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.1.0"
+  }
+}
