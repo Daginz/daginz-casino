@@ -48,6 +48,9 @@ cp .env.example .env
 pnpm dev
 ```
 
+> Запуск собранного backend: `node --env-file=.env dist/main.js` (Node 22 читает .env нативно).
+> Если порт 4000 занят «зомби»-процессом: `netstat -ano | grep :4000` → `taskkill /PID <pid> /F`.
+
 Сервисы:
 - Backend: http://localhost:4000  (health: `/health`)
 - Wallet (Go): http://localhost:4100  (health: `/health`)
