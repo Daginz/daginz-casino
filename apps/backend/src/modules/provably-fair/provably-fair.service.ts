@@ -1,49 +1,96 @@
-import { Injectable } from '@nestjs/common';
-import { createHash, createHmac } from 'node:crypto';
+import { Inject, Injectable } from '@nestjs/common';
+import { createHash, createHmac, randomBytes } from 'node:crypto';
+import type { PlayerId } from '@casino/contracts';
 import type {
+  ActiveCommitment,
+  FairDraw,
   IProvablyFairService,
   RevealedSeed,
-  SeedCommitment,
 } from '@/contracts/provably-fair.contract';
+import {
+  SEED_DATA_PROVIDER,
+  type ISeedDataProvider,
+  type SeedPair,
+} from '@/contracts/data-providers/seed-data-provider.contract';
+import { err, ok, type Result } from '@/shared/result';
+import { DomainError, EntityNotFoundError } from '@/shared/errors/domain-error';
 
 /**
- * Provably-fair core. This is pure, deterministic logic (no I/O), so it is
- * fully implemented now — the rest of the system (seed storage, rotation)
- * lands in Block D, but the algorithm itself is stable.
+ * Provably-fair commit-reveal. The outcome of a round is fully determined by
+ * (serverSeed, clientSeed, nonce); the serverSeed hash is committed before
+ * play and the seed revealed after, so any player can verify fairness.
  *
- * outcome = HMAC_SHA256(serverSeed, `${clientSeed}:${nonce}`) → first 8 hex
- *           digits mapped into [0, 1).
+ * Shared by every game: a game never rolls its own RNG.
  */
 @Injectable()
 export class ProvablyFairService implements IProvablyFairService {
-  outcome(commitment: SeedCommitment): number {
-    // At commitment time we only have the hash; the real outcome needs the
-    // server seed. For the stub we derive from the hash deterministically so
-    // endpoints are wireable; Block D swaps in the revealed-seed HMAC.
-    return this.toUnitInterval(commitment.serverSeedHash, commitment.clientSeed, commitment.nonce);
+  constructor(@Inject(SEED_DATA_PROVIDER) private readonly seeds: ISeedDataProvider) {}
+
+  async getActiveCommitment(playerId: PlayerId): Promise<ActiveCommitment> {
+    const seed = await this.ensureActive(playerId);
+    return { serverSeedHash: seed.serverSeedHash, clientSeed: seed.clientSeed, nonce: seed.nonce };
+  }
+
+  async draw(playerId: PlayerId): Promise<Result<FairDraw, DomainError>> {
+    await this.ensureActive(playerId);
+    const drawn = await this.seeds.drawNonce(playerId);
+    if (!drawn) return err(new EntityNotFoundError('No active seed to draw from'));
+
+    const outcome = this.hmacOutcome(drawn.serverSeed, drawn.clientSeed, drawn.nonce);
+    return ok({
+      outcome,
+      serverSeedHash: drawn.serverSeedHash,
+      clientSeed: drawn.clientSeed,
+      nonce: drawn.nonce,
+    });
+  }
+
+  async rotate(playerId: PlayerId, clientSeed: string): Promise<ActiveCommitment> {
+    await this.seeds.revealActive(playerId); // retire current, if any
+    const created = await this.createSeed(playerId, clientSeed);
+    return {
+      serverSeedHash: created.serverSeedHash,
+      clientSeed: created.clientSeed,
+      nonce: created.nonce,
+    };
+  }
+
+  async reveal(playerId: PlayerId): Promise<Result<RevealedSeed, DomainError>> {
+    const revealed = await this.seeds.revealActive(playerId);
+    if (!revealed) return err(new EntityNotFoundError('No active seed to reveal'));
+    return ok({
+      serverSeed: revealed.serverSeed,
+      serverSeedHash: revealed.serverSeedHash,
+      clientSeed: revealed.clientSeed,
+      nonce: revealed.nonce,
+    });
   }
 
   verify(revealed: RevealedSeed, claimedOutcome: number): boolean {
     const hash = createHash('sha256').update(revealed.serverSeed).digest('hex');
     if (hash !== revealed.serverSeedHash) return false;
     const recomputed = this.hmacOutcome(revealed.serverSeed, revealed.clientSeed, revealed.nonce);
-    return Math.abs(recomputed - claimedOutcome) < 1e-9;
+    return Math.abs(recomputed - claimedOutcome) < 1e-12;
+  }
+
+  private async ensureActive(playerId: PlayerId): Promise<SeedPair> {
+    const existing = await this.seeds.findActive(playerId);
+    if (existing) return existing;
+    // Default client seed if the player hasn't chosen one.
+    return this.createSeed(playerId, randomBytes(8).toString('hex'));
+  }
+
+  private async createSeed(playerId: PlayerId, clientSeed: string): Promise<SeedPair> {
+    const serverSeed = randomBytes(32).toString('hex');
+    const serverSeedHash = createHash('sha256').update(serverSeed).digest('hex');
+    return this.seeds.createActive({ playerId, serverSeed, serverSeedHash, clientSeed });
   }
 
   private hmacOutcome(serverSeed: string, clientSeed: string, nonce: number): number {
-    const digest = createHmac('sha256', serverSeed).update(`${clientSeed}:${nonce}`).digest('hex');
-    return this.hexToUnit(digest);
-  }
-
-  private toUnitInterval(serverSeedHash: string, clientSeed: string, nonce: number): number {
-    const digest = createHash('sha256')
-      .update(`${serverSeedHash}:${clientSeed}:${nonce}`)
+    const digest = createHmac('sha256', serverSeed)
+      .update(`${clientSeed}:${nonce}`)
       .digest('hex');
-    return this.hexToUnit(digest);
-  }
-
-  private hexToUnit(digest: string): number {
-    const slice = digest.slice(0, 8);
-    return parseInt(slice, 16) / 0x100000000;
+    // First 13 hex chars → 52 bits → uniform float in [0, 1).
+    return parseInt(digest.slice(0, 13), 16) / 2 ** 52;
   }
 }

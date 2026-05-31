@@ -16,8 +16,10 @@ import { err, ok, type Result } from '@/shared/result';
 import { DomainError, EntityNotFoundError } from '@/shared/errors/domain-error';
 
 /**
- * Orchestrates a round across provably-fair + wallet — STUB (Block C).
- * Wiring and DI graph are real; full bet→outcome→payout→ledger flow is Block E.
+ * Orchestrates a round across provably-fair + wallet — STUB (Block C/D).
+ * The full generic round lifecycle and the GameDefinition registry land in
+ * Block E (Game Engine framework). For now this just exercises the real
+ * provably-fair draw so the DI graph and PF service are verifiable.
  */
 @Injectable()
 export class GameService implements IGameService {
@@ -27,22 +29,19 @@ export class GameService implements IGameService {
   ) {}
 
   async placeBet(input: PlaceBetInput): Promise<Result<GameRound, DomainError>> {
-    // Stub: derive a placeholder outcome so the wiring is demonstrable.
-    const outcome = this.fair.outcome({
-      serverSeedHash: randomUUID().replace(/-/g, ''),
-      clientSeed: input.clientSeed,
-      nonce: 0,
-    });
+    const draw = await this.fair.draw(input.playerId);
+    if (!draw.ok) return err(draw.error);
+
     const round: GameRound = {
       id: asGameRoundId(randomUUID()),
       playerId: input.playerId,
       game: input.game,
       amount: input.amount,
-      outcome,
-      payout: 0n,
-      serverSeedHash: 'stub-hash',
-      clientSeed: input.clientSeed,
-      nonce: 0,
+      outcome: draw.value.outcome,
+      payout: 0n, // payout calc belongs to the GameDefinition (Block E)
+      serverSeedHash: draw.value.serverSeedHash,
+      clientSeed: draw.value.clientSeed,
+      nonce: draw.value.nonce,
       createdAt: new Date(),
     };
     return ok(round);
