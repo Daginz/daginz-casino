@@ -2,11 +2,13 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { env } from '@/config/env';
 import { AppModule } from '@/composition/app.module';
+import { DomainErrorFilter } from '@/shared/errors/domain-error.filter';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({ origin: true, credentials: true });
+  app.useGlobalFilters(new DomainErrorFilter());
 
   const config = new DocumentBuilder()
     .setTitle('Casino API')

@@ -1,7 +1,5 @@
 // Command server starts the wallet/ledger HTTP service.
-//
-// This is the skeleton for Block B: it only serves /health.
-// The double-entry ledger, balance and bet/win/rollback API land in Block D.
+// This is the composition root: all wiring happens here, explicitly.
 package main
 
 import (
@@ -15,14 +13,24 @@ import (
 	"time"
 
 	"github.com/casino/wallet/internal/api"
+	"github.com/casino/wallet/internal/clock"
 	"github.com/casino/wallet/internal/config"
+	"github.com/casino/wallet/internal/ledger/adapters/httpapi"
+	"github.com/casino/wallet/internal/ledger/adapters/memory"
+	"github.com/casino/wallet/internal/ledger/app"
 )
 
 func main() {
 	cfg := config.Load()
 
+	// Composition: in-memory repo (Block C) + system clock → ledger service → HTTP adapter.
+	repo := memory.New()
+	ledgerSvc := app.NewService(repo, clock.System{})
+	ledgerHandler := httpapi.New(ledgerSvc)
+
 	mux := http.NewServeMux()
-	api.RegisterRoutes(mux)
+	api.RegisterRoutes(mux) // /health
+	ledgerHandler.Register(mux)
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
@@ -37,7 +45,6 @@ func main() {
 		}
 	}()
 
-	// Graceful shutdown.
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	<-stop
