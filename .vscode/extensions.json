@@ -1,0 +1,9 @@
+{
+  "recommendations": [
+    "hediet.vscode-drawio",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "golang.go",
+    "bradlc.vscode-tailwindcss"
+  ]
+}

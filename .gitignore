@@ -1,0 +1,40 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# builds
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# go
+apps/wallet/bin/
+apps/wallet/tmp/
+
+# env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# editor / os
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+Thumbs.db
+
+# docker volumes (if mapped locally)
+infra/.data/
+
+# evm
+apps/contracts-evm/cache/
+apps/contracts-evm/artifacts/
+apps/contracts-evm/typechain-types/
