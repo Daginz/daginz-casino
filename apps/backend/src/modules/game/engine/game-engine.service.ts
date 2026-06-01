@@ -6,6 +6,7 @@ import {
   type IProvablyFairService,
 } from '@/contracts/provably-fair.contract';
 import { WALLET_SERVICE, type IWalletService } from '@/contracts/wallet.contract';
+import { BONUS_SERVICE, type IBonusService } from '@/contracts/bonus.contract';
 import { EVENT_BUS, type IEventBus } from '@/contracts/events.contract';
 import {
   GAME_ROUND_DATA_PROVIDER,
@@ -26,6 +27,8 @@ export interface PlayRoundInput {
   gameId: string;
   stake: bigint;
   params: Record<string, unknown>;
+  /** If true and the player has a free spin, it pays for the round instead of the ledger. */
+  useFreeSpin?: boolean;
 }
 
 /**
@@ -41,6 +44,7 @@ export class GameEngineService {
     @Inject(GAME_REGISTRY) private readonly registry: GameRegistry,
     @Inject(PROVABLY_FAIR_SERVICE) private readonly fair: IProvablyFairService,
     @Inject(WALLET_SERVICE) private readonly wallet: IWalletService,
+    @Inject(BONUS_SERVICE) private readonly bonus: IBonusService,
     @Inject(GAME_ROUND_DATA_PROVIDER) private readonly rounds: IGameRoundDataProvider,
     @Inject(EVENT_BUS) private readonly events: IEventBus,
   ) {}
@@ -53,15 +57,25 @@ export class GameEngineService {
     const validated = def.validateParams(input.params);
     if (!validated.ok) return err(validated.error);
 
-    // 1. Debit the stake (unique idempotency key per round attempt).
+    // 1. Pay for the round. Bet SOURCE is pluggable: a free spin (promo) if the
+    //    player has one and asked to use it, otherwise the real ledger balance.
+    //    The engine stays stateless — only where the stake comes from changes.
     const roundKey = randomUUID();
-    const bet = await this.wallet.bet({
-      playerId: input.playerId,
-      amount: input.stake,
-      idempotencyKey: `bet:${roundKey}`,
-      reference: input.gameId,
-    });
-    if (!bet.ok) return err(bet.error);
+    let paidWithFreeSpin = false;
+    if (input.useFreeSpin) {
+      paidWithFreeSpin = await this.bonus.useFreeSpin(input.playerId);
+      if (!paidWithFreeSpin) {
+        return err(new ValidationError('No free spins available'));
+      }
+    } else {
+      const bet = await this.wallet.bet({
+        playerId: input.playerId,
+        amount: input.stake,
+        idempotencyKey: `bet:${roundKey}`,
+        reference: input.gameId,
+      });
+      if (!bet.ok) return err(bet.error);
+    }
 
     // 2. Provably-fair draw → seed the round RNG from the per-round secret.
     const draw = await this.fair.draw(input.playerId);

@@ -11,6 +11,7 @@ import { WalletModule } from '@/modules/wallet/wallet.module';
 import { ProvablyFairModule } from '@/modules/provably-fair/provably-fair.module';
 import { GameModule } from '@/modules/game/game.module';
 import { OnchainModule } from '@/modules/onchain/onchain.module';
+import { BonusModule } from '@/modules/bonus/bonus.module';
 
 /**
  * Root assembly. Feature modules register here as they come online.
@@ -31,6 +32,7 @@ import { OnchainModule } from '@/modules/onchain/onchain.module';
     ProvablyFairModule,
     GameModule,
     OnchainModule,
+    BonusModule,
   ],
   providers: [
     // Apply the throttler to every route by default.

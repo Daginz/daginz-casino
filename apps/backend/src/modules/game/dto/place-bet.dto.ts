@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsObject, IsOptional, IsString, Matches } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsBoolean, IsObject, IsOptional, IsString, Matches } from 'class-validator';
 // NOTE: all DTOs need class-validator decorators — the global ValidationPipe
 // runs forbidNonWhitelisted, so any undecorated field => 400.
 
@@ -20,4 +20,9 @@ export class PlaceBetDto {
   @IsObject()
   @IsOptional()
   params: Record<string, unknown> = {};
+
+  @ApiPropertyOptional({ description: 'Use a free spin instead of the ledger balance' })
+  @IsBoolean()
+  @IsOptional()
+  useFreeSpin?: boolean;
 }

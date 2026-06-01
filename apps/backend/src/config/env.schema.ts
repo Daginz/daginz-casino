@@ -35,6 +35,12 @@ export const envSchema = z.object({
   // Spins — per 10s window.
   THROTTLE_PLAY_LIMIT: z.coerce.number().int().positive().default(50),
 
+  // Bonus economy: daily reward (free spins) + cooldown, and the fixed stake a
+  // free spin plays for (so the engine's win math is consistent).
+  BONUS_DAILY_FREE_SPINS: z.coerce.number().int().positive().default(10),
+  BONUS_DAILY_COOLDOWN_MS: z.coerce.number().int().positive().default(24 * 60 * 60 * 1000),
+  BONUS_FREE_SPIN_STAKE: z.coerce.number().int().positive().default(10),
+
   // ── On-chain listener (Block F) ───────────────────────────────────
   // Enable the listener; off by default so the app boots without a chain.
   ONCHAIN_ENABLED: z.coerce.boolean().default(false),

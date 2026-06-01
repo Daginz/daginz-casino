@@ -4,6 +4,7 @@ import { env } from '@/config/env';
 import { JwtAuthGuard } from '@/modules/auth/jwt-auth.guard';
 import { ProvablyFairModule } from '@/modules/provably-fair/provably-fair.module';
 import { WalletModule } from '@/modules/wallet/wallet.module';
+import { BonusModule } from '@/modules/bonus/bonus.module';
 import { DbModule } from '@/shared/db/db.module';
 import { GAME_ROUND_DATA_PROVIDER } from '@/contracts/data-providers/game-round-data-provider.contract';
 import { GAME_REGISTRY, GameRegistry } from './engine/game-registry';
@@ -21,6 +22,7 @@ import { GameController } from './game.controller';
     DbModule,
     ProvablyFairModule,
     WalletModule,
+    BonusModule,
     JwtModule.register({ secret: env.JWT_SECRET, signOptions: { expiresIn: '15m' } }),
   ],
   controllers: [GameController],

@@ -44,6 +44,7 @@ export class GameController {
       gameId: dto.gameId,
       stake: BigInt(dto.stake),
       params: dto.params,
+      useFreeSpin: dto.useFreeSpin,
     });
     if (!result.ok) throw result.error;
     return serializeRound(result.value);

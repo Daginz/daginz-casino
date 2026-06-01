@@ -14,6 +14,7 @@ const BACKEND_MIGRATIONS = [
   '0004_game_rounds.sql',
   '0005_onchain.sql',
   '0006_refresh_tokens.sql',
+  '0007_player_bonuses.sql',
 ];
 
 export async function runMigrations(pool: Pool, migrationsDir: string): Promise<void> {
