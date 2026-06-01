@@ -56,6 +56,63 @@ func TestService_BetInsufficientFunds(t *testing.T) {
 	}
 }
 
+func TestService_RollbackReversesABet(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	svc := newService()
+	const player domain.PlayerID = "rb1"
+
+	if _, err := svc.Win(ctx, player, amt(t, 100), "win-rb1", "seed"); err != nil {
+		t.Fatalf("win: %v", err)
+	}
+	if _, err := svc.Bet(ctx, player, amt(t, 30), "bet-rb1", "round"); err != nil {
+		t.Fatalf("bet: %v", err)
+	}
+	// Balance is 70; rolling back the bet should restore it to 100.
+	bal, err := svc.Rollback(ctx, "bet-rb1")
+	if err != nil {
+		t.Fatalf("rollback: %v", err)
+	}
+	if got := bal.MinorUnits(); got != 100 {
+		t.Fatalf("balance after rollback = %d, want 100", got)
+	}
+}
+
+func TestService_RollbackIsIdempotent(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	svc := newService()
+	const player domain.PlayerID = "rb2"
+
+	if _, err := svc.Win(ctx, player, amt(t, 100), "win-rb2", "seed"); err != nil {
+		t.Fatalf("win: %v", err)
+	}
+	if _, err := svc.Bet(ctx, player, amt(t, 40), "bet-rb2", "round"); err != nil {
+		t.Fatalf("bet: %v", err)
+	}
+	if _, err := svc.Rollback(ctx, "bet-rb2"); err != nil {
+		t.Fatalf("first rollback: %v", err)
+	}
+	// A second rollback of the same op must not credit again.
+	bal, err := svc.Rollback(ctx, "bet-rb2")
+	if err != nil {
+		t.Fatalf("second rollback: %v", err)
+	}
+	if got := bal.MinorUnits(); got != 100 {
+		t.Fatalf("balance after double rollback = %d, want 100 (idempotent)", got)
+	}
+}
+
+func TestService_RollbackUnknownKey(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	svc := newService()
+
+	if _, err := svc.Rollback(ctx, "does-not-exist"); err == nil {
+		t.Fatal("expected error rolling back an unknown op, got nil")
+	}
+}
+
 func TestService_Idempotency(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

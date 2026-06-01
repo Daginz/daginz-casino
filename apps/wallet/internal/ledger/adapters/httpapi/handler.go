@@ -25,6 +25,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /ledger/{playerID}/balance", h.balance)
 	mux.HandleFunc("POST /ledger/bet", h.bet)
 	mux.HandleFunc("POST /ledger/win", h.win)
+	mux.HandleFunc("POST /ledger/rollback", h.rollback)
 }
 
 type opRequest struct {
@@ -54,6 +55,23 @@ func (h *Handler) balance(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) bet(w http.ResponseWriter, r *http.Request) { h.apply(w, r, h.svc.Bet) }
 func (h *Handler) win(w http.ResponseWriter, r *http.Request) { h.apply(w, r, h.svc.Win) }
+
+// rollback reverses a prior op by its idempotency key (compensating entry).
+func (h *Handler) rollback(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		IdempotencyKey string `json:"idempotencyKey"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.IdempotencyKey == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "idempotencyKey required"})
+		return
+	}
+	bal, err := h.svc.Rollback(r.Context(), req.IdempotencyKey)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, balanceResponse{Amount: bal.MinorUnits()})
+}
 
 func (h *Handler) apply(w http.ResponseWriter, r *http.Request, fn opFunc) {
 	var req opRequest

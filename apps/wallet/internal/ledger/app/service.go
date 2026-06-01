@@ -43,6 +43,49 @@ func (s *Service) Win(ctx context.Context, playerID domain.PlayerID, amt domain.
 	return s.apply(ctx, playerID, domain.Credit, amt, key, ref)
 }
 
+// Rollback reverses a previously-applied operation by appending a compensating
+// entry in the opposite direction for the same amount. Idempotent: a second
+// rollback of the same key is a no-op. The reversal never overdraws — the
+// floored balance keeps the result non-negative.
+func (s *Service) Rollback(ctx context.Context, key string) (domain.Amount, error) {
+	original, found, err := s.repo.FindByKey(ctx, key)
+	if err != nil {
+		return domain.Amount{}, fmt.Errorf("finding original op: %w", err)
+	}
+	if !found {
+		return domain.Amount{}, domain.ErrAccountNotFound
+	}
+
+	reversalKey := "rollback:" + key
+	seen, err := s.repo.HasOp(ctx, reversalKey)
+	if err != nil {
+		return domain.Amount{}, fmt.Errorf("checking rollback idempotency: %w", err)
+	}
+	if seen {
+		return s.repo.Balance(ctx, original.PlayerID)
+	}
+
+	reversal := domain.Entry{
+		IdempotencyKey: reversalKey,
+		PlayerID:       original.PlayerID,
+		Direction:      opposite(original.Direction),
+		Amount:         original.Amount,
+		Reference:      "rollback:" + original.Reference,
+		CreatedAt:      s.clock.Now(),
+	}
+	if appendErr := s.repo.Append(ctx, reversal); appendErr != nil {
+		return domain.Amount{}, fmt.Errorf("appending reversal: %w", appendErr)
+	}
+	return s.repo.Balance(ctx, original.PlayerID)
+}
+
+func opposite(d domain.Direction) domain.Direction {
+	if d == domain.Debit {
+		return domain.Credit
+	}
+	return domain.Debit
+}
+
 func (s *Service) apply(ctx context.Context, playerID domain.PlayerID, dir domain.Direction, amt domain.Amount, key, ref string) (domain.Amount, error) {
 	seen, err := s.repo.HasOp(ctx, key)
 	if err != nil {

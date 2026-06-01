@@ -9,6 +9,8 @@ type LedgerRepository interface {
 	Balance(ctx context.Context, playerID PlayerID) (Amount, error)
 	// HasOp reports whether an idempotency key was already applied.
 	HasOp(ctx context.Context, idempotencyKey string) (bool, error)
+	// FindByKey returns the entry for an idempotency key (ok=false if absent).
+	FindByKey(ctx context.Context, idempotencyKey string) (Entry, bool, error)
 	// Append persists a new immutable entry.
 	Append(ctx context.Context, entry Entry) error
 }

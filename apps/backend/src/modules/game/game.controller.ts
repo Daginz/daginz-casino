@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/comm
 import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { asGameRoundId, asPlayerId } from '@casino/contracts';
+import { env } from '@/config/env';
 import { JwtAuthGuard, type AuthedRequest } from '@/modules/auth/jwt-auth.guard';
 import { GameEngineService } from './engine/game-engine.service';
 import { PlaceBetDto } from './dto/place-bet.dto';
@@ -32,8 +33,8 @@ export class GameController {
   }
 
   // Cap spin rate per client — a human can't sanely spin faster, and it caps
-  // abuse / accidental loops. ~5/sec sustained.
-  @Throttle({ default: { ttl: 10_000, limit: 50 } })
+  // abuse / accidental loops. Env-tunable (per 10s window).
+  @Throttle({ default: { ttl: 10_000, limit: env.THROTTLE_PLAY_LIMIT } })
   @Post('play')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)

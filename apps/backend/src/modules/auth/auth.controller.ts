@@ -16,14 +16,15 @@ const REFRESH_PATH = '/auth';
 export class AuthController {
   constructor(@Inject(AUTH_SERVICE) private readonly auth: IAuthService) {}
 
-  // Auth is brute-force sensitive — cap tighter than the global default.
-  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  // Auth is brute-force sensitive — cap tighter than the global default
+  // (env-tunable so the demo/e2e stack can relax it).
+  @Throttle({ default: { ttl: env.THROTTLE_TTL_MS, limit: env.THROTTLE_AUTH_LIMIT } })
   @Post('challenge')
   async challenge(@Body() dto: CreateChallengeDto) {
     return this.auth.createChallenge(dto.address as WalletAddress);
   }
 
-  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  @Throttle({ default: { ttl: env.THROTTLE_TTL_MS, limit: env.THROTTLE_AUTH_LIMIT } })
   @Post('verify')
   async verify(@Body() dto: VerifySiweDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.auth.verify({ message: dto.message, signature: dto.signature });
@@ -32,7 +33,7 @@ export class AuthController {
   }
 
   /** Exchange the refresh cookie for a new access token (rotates the cookie). */
-  @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  @Throttle({ default: { ttl: env.THROTTLE_TTL_MS, limit: env.THROTTLE_AUTH_LIMIT } })
   @Post('refresh')
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const token = this.readRefreshCookie(req);

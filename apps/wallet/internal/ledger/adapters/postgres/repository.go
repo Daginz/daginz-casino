@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/casino/wallet/internal/ledger/domain"
@@ -43,6 +45,38 @@ func (r *Repository) HasOp(ctx context.Context, idempotencyKey string) (bool, er
 		return false, fmt.Errorf("checking idempotency key: %w", err)
 	}
 	return exists, nil
+}
+
+// FindByKey returns the entry with the given idempotency key, if present.
+func (r *Repository) FindByKey(ctx context.Context, idempotencyKey string) (domain.Entry, bool, error) {
+	const q = `
+		SELECT idempotency_key, player_id, direction, amount, reference, created_at
+		FROM ledger_entries
+		WHERE idempotency_key = $1`
+	var (
+		key, playerID, direction, reference string
+		amount                              int64
+		createdAt                           pgtype.Timestamptz
+	)
+	err := r.pool.QueryRow(ctx, q, idempotencyKey).Scan(&key, &playerID, &direction, &amount, &reference, &createdAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Entry{}, false, nil
+	}
+	if err != nil {
+		return domain.Entry{}, false, fmt.Errorf("finding entry by key: %w", err)
+	}
+	amt, amtErr := domain.NewAmount(amount)
+	if amtErr != nil {
+		return domain.Entry{}, false, fmt.Errorf("mapping amount: %w", amtErr)
+	}
+	return domain.Entry{
+		IdempotencyKey: key,
+		PlayerID:       domain.PlayerID(playerID),
+		Direction:      domain.Direction(direction),
+		Amount:         amt,
+		Reference:      reference,
+		CreatedAt:      createdAt.Time,
+	}, true, nil
 }
 
 // Append persists a new immutable entry. Maps a unique-violation to ErrDuplicateOp.

@@ -77,6 +77,10 @@ services:
       SIWE_DOMAIN: localhost:3000
       SIWE_STATEMENT: Sign in to Daginz, a provably-fair slot on testnet.
       WALLET_URL: http://wallet:4100
+      # Relaxed rate limits for the local demo / e2e suite (prod would tighten).
+      THROTTLE_LIMIT: "1000"
+      THROTTLE_AUTH_LIMIT: "200"
+      THROTTLE_PLAY_LIMIT: "200"
       ONCHAIN_ENABLED: "true"
       ONCHAIN_RPC_URL: http://hardhat:8545
       ONCHAIN_CHAIN_ID: "31337"

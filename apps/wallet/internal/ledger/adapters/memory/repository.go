@@ -51,6 +51,18 @@ func (r *Repository) HasOp(_ context.Context, idempotencyKey string) (bool, erro
 	return ok, nil
 }
 
+// FindByKey returns the entry with the given idempotency key, if present.
+func (r *Repository) FindByKey(_ context.Context, idempotencyKey string) (domain.Entry, bool, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for _, e := range r.entries {
+		if e.IdempotencyKey == idempotencyKey {
+			return e, true, nil
+		}
+	}
+	return domain.Entry{}, false, nil
+}
+
 // Append persists a new immutable entry.
 func (r *Repository) Append(_ context.Context, entry domain.Entry) error {
 	r.mu.Lock()

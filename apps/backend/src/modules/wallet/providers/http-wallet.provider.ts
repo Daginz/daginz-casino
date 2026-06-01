@@ -36,9 +36,13 @@ export class HttpWalletProvider implements IWalletService {
     return this.requestBalance('/ledger/win', this.opInit(op));
   }
 
-  async rollback(_idempotencyKey: string): Promise<Result<Balance, DomainError>> {
-    // The Go ledger has no rollback endpoint yet; fail loudly instead of faking.
-    return err(new ExternalServiceError('Wallet rollback is not implemented'));
+  async rollback(idempotencyKey: string): Promise<Result<Balance, DomainError>> {
+    // Reverses a prior op via a compensating ledger entry (Go /ledger/rollback).
+    return this.requestBalance('/ledger/rollback', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ idempotencyKey }),
+    });
   }
 
   private opInit(op: LedgerOp): RequestInit {

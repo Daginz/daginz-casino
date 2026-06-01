@@ -26,9 +26,14 @@ export const envSchema = z.object({
   // Wallet (Go) service base URL — the backend calls it for ledger ops.
   WALLET_URL: z.string().url().default('http://localhost:4100'),
 
-  // Rate limiting (global default; stricter overrides on auth/play in code).
+  // Rate limiting. Global default + per-area overrides, all env-tunable so the
+  // demo/e2e stack can relax them (real prod would tighten via env).
   THROTTLE_TTL_MS: z.coerce.number().int().positive().default(60_000),
   THROTTLE_LIMIT: z.coerce.number().int().positive().default(120),
+  // Auth (brute-force sensitive) — per THROTTLE_TTL_MS window.
+  THROTTLE_AUTH_LIMIT: z.coerce.number().int().positive().default(20),
+  // Spins — per 10s window.
+  THROTTLE_PLAY_LIMIT: z.coerce.number().int().positive().default(50),
 
   // ── On-chain listener (Block F) ───────────────────────────────────
   // Enable the listener; off by default so the app boots without a chain.
