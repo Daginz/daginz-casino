@@ -8,7 +8,8 @@
     "test": "hardhat test",
     "node": "hardhat node",
     "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
-    "typecheck": "tsc --noEmit"
+    "smoke:onchain": "hardhat run scripts/onchain-smoke.ts --network localhost",
+    "smoke:withdraw": "hardhat run scripts/withdraw-check.ts --network localhost"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
