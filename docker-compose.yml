@@ -1,0 +1,120 @@
+# Full stack — `docker compose up` brings up the entire casino:
+#   Postgres + Redis + Hardhat (auto-deploy) + Go ledger + backend + frontend.
+# Then open http://localhost:3000 and play (use the Demo wallet).
+#
+# Everything here is TESTNET / LOCAL only. The keys below are the well-known
+# public Hardhat dev keys — they hold no real value and are safe to commit.
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: casino
+      POSTGRES_PASSWORD: casino
+      POSTGRES_DB: casino
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U casino -d casino"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  hardhat:
+    build:
+      context: .
+      dockerfile: apps/contracts-evm/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8545:8545"
+    healthcheck:
+      # Healthy only once the node answers AND the deploy step has run.
+      test: ["CMD-SHELL", "curl -s -X POST http://127.0.0.1:8545 -H 'content-type: application/json' -d '{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}' | grep -q result"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  wallet:
+    build:
+      context: .
+      dockerfile: apps/wallet/Dockerfile
+    restart: unless-stopped
+    environment:
+      WALLET_PORT: "4100"
+      WALLET_STORE: postgres
+      DATABASE_URL: postgres://casino:casino@postgres:5432/casino?sslmode=disable
+    ports:
+      - "4100:4100"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      BACKEND_PORT: "4000"
+      DATABASE_URL: postgres://casino:casino@postgres:5432/casino?sslmode=disable
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev-only-jwt-secret-change-me
+      SIWE_DOMAIN: localhost:3000
+      SIWE_STATEMENT: Sign in to Daginz, a provably-fair slot on testnet.
+      WALLET_URL: http://wallet:4100
+      ONCHAIN_ENABLED: "true"
+      ONCHAIN_RPC_URL: http://hardhat:8545
+      ONCHAIN_CHAIN_ID: "31337"
+      ONCHAIN_CHIP_ADDRESS: "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+      ONCHAIN_VAULT_ADDRESS: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+      # Hardhat account #0 — the Vault owner/deployer (signs withdrawals).
+      ONCHAIN_OWNER_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+      ONCHAIN_POLL_MS: "2000"
+      ONCHAIN_CONFIRMATIONS: "1"
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      wallet:
+        condition: service_started
+      hardhat:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+      # Browser-facing config baked at build time (host ports, not service names).
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:4000
+        NEXT_PUBLIC_CHAIN_ID: "31337"
+        NEXT_PUBLIC_RPC_URL: http://127.0.0.1:8545
+        NEXT_PUBLIC_CHIP_TOKEN_ADDRESS: "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+        NEXT_PUBLIC_VAULT_ADDRESS: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_started
+
+volumes:
+  pgdata:

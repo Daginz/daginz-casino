@@ -59,7 +59,27 @@ infra/
 docs/             architecture, diagram, regulatory research
 ```
 
-## Quick start (local)
+## Quick start — one command (Docker)
+
+The whole stack runs from a single command. Just Docker is required.
+
+```bash
+docker compose up --build
+```
+
+This brings up Postgres, Redis, a Hardhat chain (with the contracts
+auto-deployed), the Go ledger, the backend (with the on-chain listener), and
+the frontend. Then open **http://localhost:3000** and click **Demo wallet** to
+play — no MetaMask or setup needed.
+
+> First build takes a few minutes (compiling contracts + installing deps).
+> Everything is local/testnet; the keys baked into `docker-compose.yml` are the
+> well-known public Hardhat dev keys (no real value).
+>
+> To play with MetaMask instead of the demo wallet, add a network with RPC
+> `http://127.0.0.1:8545`, chain ID `31337`, and import a Hardhat test account.
+
+## Quick start — manual (for development)
 
 Prereqs: Node 22+, pnpm 10+, Go 1.22+, Docker.
 
