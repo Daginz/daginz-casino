@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── TypeScript: backend + frontend + contracts package ──────────────
+  node:
+    name: Node (typecheck + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared contracts package
+        run: pnpm --filter @casino/contracts build
+
+      - name: Typecheck (all workspaces)
+        run: pnpm -r typecheck
+
+      - name: Backend unit tests
+        run: pnpm --filter @casino/backend test
+
+  # ── Solidity contracts: compile + hardhat tests ─────────────────────
+  contracts:
+    name: EVM contracts (compile + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Compile contracts
+        run: pnpm --filter @casino/contracts-evm build
+
+      - name: Contract tests
+        run: pnpm --filter @casino/contracts-evm test
+
+  # ── Go wallet/ledger: vet + tests ──────────────────────────────────
+  go:
+    name: Go wallet (vet + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/wallet
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache-dependency-path: apps/wallet/go.sum
+
+      - name: Go vet
+        run: go vet ./...
+
+      - name: Go tests (race detector)
+        run: go test -race ./...
