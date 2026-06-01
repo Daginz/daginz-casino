@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 
 interface HealthResponse {
@@ -9,6 +10,7 @@ interface HealthResponse {
 
 @ApiTags('health')
 @Controller('health')
+@SkipThrottle() // monitoring / container healthchecks must never be rate-limited
 export class HealthController {
   @Get()
   @ApiOkResponse({ description: 'Service is healthy' })

@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Inject, Post, Req, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { WalletAddress } from '@casino/contracts';
 import { AUTH_SERVICE, type IAuthService } from '@/contracts/auth.contract';
@@ -10,11 +11,14 @@ import { JwtAuthGuard, type AuthedRequest } from './jwt-auth.guard';
 export class AuthController {
   constructor(@Inject(AUTH_SERVICE) private readonly auth: IAuthService) {}
 
+  // Auth is brute-force sensitive — cap tighter than the global default.
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
   @Post('challenge')
   async challenge(@Body() dto: CreateChallengeDto) {
     return this.auth.createChallenge(dto.address as WalletAddress);
   }
 
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
   @Post('verify')
   async verify(@Body() dto: VerifySiweDto) {
     const result = await this.auth.verify({ message: dto.message, signature: dto.signature });

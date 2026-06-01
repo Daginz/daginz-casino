@@ -1,4 +1,7 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { env } from '@/config/env';
 import { LoggingModule } from '@/shared/logging/logging.module';
 import { EventsModule } from '@/shared/events/events.module';
 import { DbModule } from '@/shared/db/db.module';
@@ -14,6 +17,11 @@ import { OnchainModule } from '@/modules/onchain/onchain.module';
  */
 @Module({
   imports: [
+    // Global rate limiting. Named default bucket; controllers/routes can apply
+    // stricter @Throttle overrides (e.g. auth, /game/play).
+    ThrottlerModule.forRoot([
+      { name: 'default', ttl: env.THROTTLE_TTL_MS, limit: env.THROTTLE_LIMIT },
+    ]),
     LoggingModule,
     EventsModule,
     DbModule,
@@ -23,6 +31,10 @@ import { OnchainModule } from '@/modules/onchain/onchain.module';
     ProvablyFairModule,
     GameModule,
     OnchainModule,
+  ],
+  providers: [
+    // Apply the throttler to every route by default.
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}
