@@ -66,6 +66,12 @@ export async function signInDemo(): Promise<VerifyResult> {
   });
 }
 
-export function signOut(): void {
+export async function signOut(): Promise<void> {
+  // Revoke the refresh token server-side, then drop the access token locally.
+  try {
+    await api.post('/auth/logout', {});
+  } catch {
+    /* best-effort — clear locally regardless */
+  }
   setToken(null);
 }

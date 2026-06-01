@@ -24,7 +24,12 @@ export interface SiweVerification {
 
 export interface AuthSession {
   player: Player;
+  /** Short-lived JWT for the Authorization header. */
   accessToken: string;
+  /** Opaque long-lived token — set as an HTTP-only cookie, never in JS. */
+  refreshToken: string;
+  /** When the refresh token expires (for the cookie Max-Age). */
+  refreshExpiresAt: Date;
 }
 
 export interface IAuthService {
@@ -32,6 +37,13 @@ export interface IAuthService {
   createChallenge(address: WalletAddress): Promise<SiweChallenge>;
   /** Verify the signed SIWE message and start a session (SIWE step 2). */
   verify(input: SiweVerification): Promise<Result<AuthSession, DomainError>>;
+  /**
+   * Exchange a valid refresh token for a new session (rotates the refresh
+   * token; the presented one is revoked). Detects reuse of a revoked token.
+   */
+  refresh(refreshToken: string): Promise<Result<AuthSession, DomainError>>;
+  /** Revoke a refresh token (logout). Safe to call with an unknown token. */
+  logout(refreshToken: string): Promise<void>;
   /** Resolve a player by id (used by other modules). */
   getPlayer(id: PlayerId): Promise<Result<Player, DomainError>>;
 }

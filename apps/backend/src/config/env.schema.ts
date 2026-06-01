@@ -14,6 +14,11 @@ export const envSchema = z.object({
 
   JWT_SECRET: z.string().min(8),
 
+  // Refresh-token lifetime (opaque token, HTTP-only cookie). Default 30 days.
+  REFRESH_TTL_MS: z.coerce.number().int().positive().default(30 * 24 * 60 * 60 * 1000),
+  // Mark the refresh cookie Secure (HTTPS only) — enable in production.
+  AUTH_COOKIE_SECURE: z.coerce.boolean().default(false),
+
   // SIWE (Sign-In With Ethereum) — used in Block D
   SIWE_DOMAIN: z.string().default('localhost:3000'),
   SIWE_STATEMENT: z.string().default('Sign in to Casino (testnet)'),

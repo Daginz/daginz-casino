@@ -47,13 +47,52 @@ interface ErrorEnvelope {
   message?: string;
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function rawFetch(path: string, init: RequestInit): Promise<Response> {
   const headers = new Headers(init.headers);
   headers.set('content-type', 'application/json');
   const t = getToken();
   if (t) headers.set('authorization', `Bearer ${t}`);
+  // Include the HTTP-only refresh cookie on auth calls.
+  return fetch(`${BASE_URL}${path}`, { ...init, headers, credentials: 'include' });
+}
 
-  const res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
+// A single in-flight refresh shared across concurrent 401s.
+let refreshing: Promise<boolean> | null = null;
+
+/** Try to mint a new access token from the refresh cookie. Returns success. */
+async function tryRefresh(): Promise<boolean> {
+  if (!refreshing) {
+    refreshing = (async () => {
+      try {
+        const res = await rawFetch('/auth/refresh', { method: 'POST' });
+        if (!res.ok) {
+          setToken(null);
+          return false;
+        }
+        const body = (await res.json()) as VerifyResult;
+        setToken(body.accessToken);
+        return true;
+      } catch {
+        return false;
+      } finally {
+        // Cleared after this microtask so concurrent callers reuse the result.
+        setTimeout(() => {
+          refreshing = null;
+        }, 0);
+      }
+    })();
+  }
+  return refreshing;
+}
+
+async function request<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
+  const res = await rawFetch(path, init);
+
+  // Access token expired → refresh once and replay the original request.
+  if (res.status === 401 && retry && !path.startsWith('/auth/')) {
+    const ok = await tryRefresh();
+    if (ok) return request<T>(path, init, false);
+  }
 
   if (!res.ok) {
     let code = 'UNKNOWN';

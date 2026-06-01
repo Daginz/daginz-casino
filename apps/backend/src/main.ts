@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import cookieParser from 'cookie-parser';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger as PinoLogger } from 'nestjs-pino';
 import { join } from 'node:path';
@@ -18,6 +19,7 @@ async function bootstrap(): Promise<void> {
   app.useLogger(logger);
 
   app.enableCors({ origin: true, credentials: true });
+  app.use(cookieParser()); // read the HTTP-only refresh-token cookie
   app.useGlobalFilters(new DomainErrorFilter(logger));
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),

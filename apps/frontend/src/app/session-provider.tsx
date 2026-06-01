@@ -106,7 +106,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const disconnect = useCallback(() => {
-    signOut();
+    void signOut();
     setPlayer(null);
     setMode(null);
     setDemoAddress(null);

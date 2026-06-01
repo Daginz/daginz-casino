@@ -13,6 +13,7 @@ const BACKEND_MIGRATIONS = [
   '0003_provably_fair_seeds.sql',
   '0004_game_rounds.sql',
   '0005_onchain.sql',
+  '0006_refresh_tokens.sql',
 ];
 
 export async function runMigrations(pool: Pool, migrationsDir: string): Promise<void> {
