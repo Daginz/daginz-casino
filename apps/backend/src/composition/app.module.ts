@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { LoggingModule } from '@/shared/logging/logging.module';
 import { DbModule } from '@/shared/db/db.module';
 import { HealthModule } from '@/modules/health/health.module';
 import { AuthModule } from '@/modules/auth/auth.module';
@@ -12,6 +13,7 @@ import { OnchainModule } from '@/modules/onchain/onchain.module';
  */
 @Module({
   imports: [
+    LoggingModule,
     DbModule,
     HealthModule,
     AuthModule,

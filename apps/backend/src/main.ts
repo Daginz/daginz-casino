@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { Logger as PinoLogger } from 'nestjs-pino';
 import { join } from 'node:path';
 import type { Pool } from 'pg';
 import { env } from '@/config/env';
@@ -10,15 +11,19 @@ import { PG_POOL } from '@/shared/db/db.module';
 import { runMigrations } from '@/shared/db/migrate';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+
+  // Route Nest's own logs through pino, and use it as the app logger.
+  const logger = app.get(PinoLogger);
+  app.useLogger(logger);
 
   app.enableCors({ origin: true, credentials: true });
-  app.useGlobalFilters(new DomainErrorFilter());
+  app.useGlobalFilters(new DomainErrorFilter(logger));
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
   );
 
-  // Apply backend-owned migrations (players). Migrations live at repo-root infra/migrations.
+  // Backend-owned migrations (players, seeds, rounds, onchain).
   const pool = app.get<Pool>(PG_POOL);
   const migrationsDir = join(process.cwd(), '..', '..', 'infra', 'migrations');
   await runMigrations(pool, migrationsDir);
@@ -33,11 +38,7 @@ async function bootstrap(): Promise<void> {
   SwaggerModule.setup('docs', app, document);
 
   await app.listen(env.BACKEND_PORT);
-
-  // eslint-disable-next-line no-console
-  console.log(`[backend] listening on http://localhost:${env.BACKEND_PORT}`);
-  // eslint-disable-next-line no-console
-  console.log(`[backend] swagger on http://localhost:${env.BACKEND_PORT}/docs`);
+  logger.log(`backend listening on http://localhost:${env.BACKEND_PORT} (swagger: /docs)`);
 }
 
 void bootstrap();
