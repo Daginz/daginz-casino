@@ -20,6 +20,12 @@ export interface IOnchainDataProvider {
    */
   recordDepositIfNew(ev: DepositEventRecord): Promise<boolean>;
   markDepositCredited(txHash: string, logIndex: number): Promise<void>;
+  /**
+   * Deposits recorded but not yet credited — a credit may have failed mid-flight
+   * (wallet down) after the dedupe row was written. The reconcile pass retries
+   * these so no deposit is silently lost.
+   */
+  listUncreditedDeposits(limit: number): Promise<DepositEventRecord[]>;
 
   /** Withdrawal bookkeeping for reconciliation. */
   createWithdrawal(id: string, playerAddr: string, amount: bigint): Promise<void>;

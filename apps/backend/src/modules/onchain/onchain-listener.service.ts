@@ -44,7 +44,9 @@ const DEPOSIT_EVENT = parseAbiItem(
 export class OnchainListenerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(OnchainListenerService.name);
   private timer: NodeJS.Timeout | null = null;
+  private reconcileTimer: NodeJS.Timeout | null = null;
   private running = false;
+  private reconciling = false;
   private readonly publicClient: PublicClient;
   private readonly walletClient: WalletClient | null;
   private readonly vault: Address;
@@ -71,16 +73,47 @@ export class OnchainListenerService implements OnModuleInit, OnModuleDestroy {
     }
     this.logger.log(`On-chain listener started; vault=${this.vault} rpc=${env.ONCHAIN_RPC_URL}`);
     this.schedule();
+    this.scheduleReconcile();
   }
 
   onModuleDestroy(): void {
     if (this.timer) clearTimeout(this.timer);
+    if (this.reconcileTimer) clearTimeout(this.reconcileTimer);
   }
 
   private schedule(): void {
     this.timer = setTimeout(() => {
       void this.poll().finally(() => this.schedule());
     }, env.ONCHAIN_POLL_MS);
+  }
+
+  private scheduleReconcile(): void {
+    this.reconcileTimer = setTimeout(() => {
+      void this.reconcile().finally(() => this.scheduleReconcile());
+    }, env.ONCHAIN_RECONCILE_MS);
+  }
+
+  /**
+   * Retry crediting deposits that were recorded (dedupe row written) but whose
+   * ledger credit didn't land — e.g. the wallet service was down at the moment
+   * the event was first seen. Idempotent: the credit uses the same key, so a
+   * deposit can never be double-credited even if the live handler also retries.
+   */
+  async reconcile(): Promise<void> {
+    if (this.reconciling) return;
+    this.reconciling = true;
+    try {
+      const pending = await this.store.listUncreditedDeposits(50);
+      if (pending.length === 0) return;
+      this.logger.log(`reconcile: ${pending.length} uncredited deposit(s) to retry`);
+      for (const dep of pending) {
+        await this.creditDeposit(dep);
+      }
+    } catch (err) {
+      this.logger.error(`reconcile failed: ${String(err)}`);
+    } finally {
+      this.reconciling = false;
+    }
   }
 
   /** One poll cycle: scan new blocks for Deposit events and credit them. */
@@ -123,38 +156,53 @@ export class OnchainListenerService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const isNew = await this.store.recordDepositIfNew({
+    const record = {
       txHash: transactionHash,
       logIndex,
       playerAddr: args.player,
       amount: args.amount,
       nonce: args.nonce ?? 0n,
-    });
-    if (!isNew) return; // already processed (dedupe)
+    };
+    const isNew = await this.store.recordDepositIfNew(record);
+    if (!isNew) return; // already recorded (dedupe); reconcile handles retries
 
+    await this.creditDeposit(record);
+  }
+
+  /**
+   * Credit a recorded deposit to the ledger and mark it credited. Shared by the
+   * live handler and the reconcile pass. The ledger credit is idempotent on the
+   * `deposit:<tx>:<logIndex>` key, so calling this twice for one deposit is safe.
+   */
+  private async creditDeposit(record: {
+    txHash: string;
+    logIndex: number;
+    playerAddr: string;
+    amount: bigint;
+  }): Promise<void> {
     // Convert on-chain wei to whole-CHIP ledger units (int64-safe). Sub-CHIP
     // dust is ignored on testnet (faucet mints whole CHIP).
-    const { chip } = weiToChip(args.amount);
+    const { chip } = weiToChip(record.amount);
 
-    const playerId = asPlayerId(args.player.toLowerCase());
+    const playerId = asPlayerId(record.playerAddr.toLowerCase());
     const credit = await this.wallet.win({
       playerId,
       amount: chip,
-      idempotencyKey: `deposit:${transactionHash}:${logIndex}`,
+      idempotencyKey: `deposit:${record.txHash}:${record.logIndex}`,
       reference: 'onchain-deposit',
     });
     if (!credit.ok) {
-      this.logger.error(`ledger credit failed for ${transactionHash}: ${credit.error.message}`);
-      return; // leave credited=false; a later reconcile can retry
+      this.logger.error(`ledger credit failed for ${record.txHash}: ${credit.error.message}`);
+      return; // leave credited=false; the reconcile pass retries
     }
-    await this.store.markDepositCredited(transactionHash, logIndex);
+    await this.store.markDepositCredited(record.txHash, record.logIndex);
     this.logger.log(`credited deposit ${chip} CHIP to ${playerId}`);
 
     await this.events.publish({
       name: 'onchain.deposit.confirmed',
       playerId,
       chip: chip.toString(),
-      txHash: transactionHash,
+      txHash: record.txHash,
     });
   }
 

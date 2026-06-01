@@ -42,6 +42,9 @@ export const envSchema = z.object({
   ONCHAIN_CHAIN_ID: z.coerce.number().int().positive().default(31337),
   ONCHAIN_VAULT_ADDRESS: z.string().default(''),
   ONCHAIN_CHIP_ADDRESS: z.string().default(''),
+  // Reconcile cadence: retry crediting recorded-but-uncredited deposits whose
+  // ledger credit failed mid-flight. Default 30s.
+  ONCHAIN_RECONCILE_MS: z.coerce.number().int().positive().default(30_000),
   // Owner key that signs withdrawal txs (testnet only; never a real key here).
   ONCHAIN_OWNER_KEY: z.string().default(''),
   // Poll cadence + confirmations before crediting a deposit.

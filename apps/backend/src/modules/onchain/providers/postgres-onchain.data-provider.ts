@@ -41,6 +41,30 @@ export class PostgresOnchainDataProvider implements IOnchainDataProvider {
     );
   }
 
+  async listUncreditedDeposits(limit: number): Promise<DepositEventRecord[]> {
+    const { rows } = await this.pool.query<{
+      tx_hash: string;
+      log_index: number;
+      player_addr: string;
+      amount: string;
+      nonce: string;
+    }>(
+      `SELECT tx_hash, log_index, player_addr, amount, nonce
+         FROM onchain_deposits
+        WHERE credited = false
+        ORDER BY created_at ASC
+        LIMIT $1`,
+      [limit],
+    );
+    return rows.map((r) => ({
+      txHash: r.tx_hash,
+      logIndex: r.log_index,
+      playerAddr: r.player_addr,
+      amount: BigInt(r.amount),
+      nonce: BigInt(r.nonce),
+    }));
+  }
+
   async createWithdrawal(id: string, playerAddr: string, amount: bigint): Promise<void> {
     await this.pool.query(
       `INSERT INTO onchain_withdrawals (withdrawal_id, player_addr, amount)
