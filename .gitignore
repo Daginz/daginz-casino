@@ -44,3 +44,7 @@ apps/contracts-evm/typechain-types/
 # local onchain env (contains testnet owner key)
 apps/backend/.env*
 !apps/backend/.env.example
+
+# test artifacts
+apps/backend/jest-out.txt
+apps/backend/coverage/
