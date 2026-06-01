@@ -1,8 +1,10 @@
 # Claude Code / AI assistant artifacts (never commit)
+# NOTE: do NOT add a bare `memory/` — it false-matches src dirs like
+# apps/wallet/internal/ledger/adapters/memory/. Claude's memory lives outside
+# the repo (~/.claude/...), and .claude/ already covers any in-repo case.
 .claude/
 CLAUDE.md
 **/CLAUDE.local.md
-memory/
 .aider*
 .cursor/
 
@@ -20,6 +22,7 @@ out/
 # go
 apps/wallet/bin/
 apps/wallet/tmp/
+apps/wallet/.gotmp/
 apps/wallet/*.out.log
 apps/wallet/*.err.log
 

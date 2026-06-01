@@ -56,6 +56,48 @@ func TestService_BetInsufficientFunds(t *testing.T) {
 	}
 }
 
+func TestService_Balance(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	svc := newService()
+
+	// Unknown player → zero, no error.
+	zero, err := svc.Balance(ctx, "nobody")
+	if err != nil || zero.MinorUnits() != 0 {
+		t.Fatalf("Balance(unknown) = %d, %v; want 0, nil", zero.MinorUnits(), err)
+	}
+
+	if _, err := svc.Win(ctx, "bp", amt(t, 80), "w-bp", "seed"); err != nil {
+		t.Fatalf("win: %v", err)
+	}
+	bal, err := svc.Balance(ctx, "bp")
+	if err != nil || bal.MinorUnits() != 80 {
+		t.Fatalf("Balance = %d, %v; want 80, nil", bal.MinorUnits(), err)
+	}
+}
+
+func TestService_RollbackReversesAWin(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	svc := newService()
+	const player domain.PlayerID = "rbw"
+
+	// Two wins; roll back the second — exercises the credit→debit reversal path.
+	if _, err := svc.Win(ctx, player, amt(t, 100), "w1-rbw", "seed"); err != nil {
+		t.Fatalf("win1: %v", err)
+	}
+	if _, err := svc.Win(ctx, player, amt(t, 40), "w2-rbw", "bonus"); err != nil {
+		t.Fatalf("win2: %v", err)
+	}
+	bal, err := svc.Rollback(ctx, "w2-rbw")
+	if err != nil {
+		t.Fatalf("rollback: %v", err)
+	}
+	if got := bal.MinorUnits(); got != 100 {
+		t.Fatalf("balance after rolling back a win = %d, want 100", got)
+	}
+}
+
 func TestService_RollbackReversesABet(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
