@@ -153,6 +153,42 @@ casino/
 
 **Подзадачи на потом:** 243-ways слот как 2-я игра (доказать расширяемость фреймворка).
 
+### Frontend (блоки H-0 … H-10) — ✅ завершён
+
+Реализация дизайна «Daginz / Sugar Pop» (из Claude Design) в Next.js, подключённого к реальному бэку.
+
+| Блок | Что | Статус |
+|---|---|---|
+| **H-0** | Бэк: `GET /wallet/balance` (фронту нужен баланс ledger) | ✅ |
+| **H-1** | Фундамент: Vanilla Extract (4 темы, keyframes), API-клиент с JWT, wagmi/viem, provider-стек | ✅ |
+| **H-2** | SIWE wallet-connect (MetaMask + честный demo-режим на локальном ключе) | ✅ e2e |
+| **H-3** | Касса: faucet/deposit/withdraw + поллинг балансов (on-chain + ledger) | ✅ e2e |
+| **H-4** | SlotCabinet 3×3 (рилы WAAPI, символы, win-FX, marquee, 5 paylines) | ✅ |
+| **H-5** | BetBar + doSpin (`POST /game/play`), near-miss, countUp, синтез-звук | ✅ e2e |
+| **H-6** | Provably-fair verify-панель (commit-reveal, пересчёт HMAC в браузере) | ✅ e2e (байт-в-байт) |
+| **H-7** | Paytable + History + Header/Hero/Footer + layout | ✅ |
+| **H-8** | Анимации polish (framer-motion, reduced-motion) + smoke | ✅ |
+| **H-9** | Прозрачность транзакций: live-степпер этапов + ссылка на эксплорер | ✅ |
+| **H-10** | Lobby (витрина казино): hero-карусель, каталог 21 игры, поиск/фильтры | ✅ |
+
+**Стек фронта:** Next.js 15 (App Router, React 19), TS strict, **Vanilla Extract** (НЕ Tailwind —
+явный выбор: `createThemeContract` + 4 темы, `keyframes`, `recipe`), TanStack Query, React Hook Form,
+Zod v4, wagmi/viem, framer-motion.
+
+**Маршруты:** `/` = Lobby (витрина) → клик по live-игре → `/play` = слот + касса/paytable/verify/history.
+
+**Карта бэк↔фронт (мок дизайна выкинут, всё на реальный API):**
+- SIWE: `POST /auth/challenge` → подпись (siwe@3) → `POST /auth/verify` → JWT. ⚠️ statement только ASCII
+  (SIWE-парсер реджектит не-ASCII при ре-парсинге на бэке).
+- Слот: `POST /game/play {gameId:'slot-classic-3x3', stake, params:{}}` → `detail.grid[col][row]` + `detail.wins[].line`.
+- Provably-fair: `GET /provably-fair/commitment`, `POST /reveal`, браузерный пересчёт `HMAC-SHA256(serverSeed, ...)`.
+- Deposit: MetaMask/demo → `CasinoVault.deposit()` → listener → ledger (асинхронно, отдельный видимый этап).
+- Withdraw: `POST /onchain/withdraw` (owner шлёт tx). Faucet: `ChipToken.faucet()`.
+- Demo-режим: подписывает SIWE well-known Hardhat-ключом, идёт через РЕАЛЬНЫЙ бэк (не мок).
+
+**Проверено e2e против живого стека:** SIWE→faucet +1000→deposit (listener кредитнул ledger)→
+спин до выигрыша→provably-fair verify в браузере (совпало точно)→withdraw (ledger −N, on-chain +N, реальный txHash).
+
 ---
 
 ## 6. Что реально работает (проверено вживую)
@@ -185,9 +221,9 @@ casino/
   **5/5 Hardhat-тестов проходят.**
 - **F-2 on-chain smoke ✅:** деплой на живую ноду, faucet → approve → deposit
   (событие, nonce) → owner withdraw. Балансы сходятся. **PASS.**
-- **F-3 listener 🔵 в отладке:** сервис написан, **компилируется (typecheck=0)**,
-  **запускается** (лог «On-chain listener started»). Но в последнем прогоне депозит
-  on-chain **не закредитовался** в ledger за 20с — **причина ещё не найдена** (см. раздел 8).
+- **F-3 listener ✅:** поллит Deposit-события, кредитует ledger ровно один раз
+  (дедуп по tx_hash+log_index, cursor в Postgres). Полный гибрид-цикл проверен (см. итог Block F).
+  Фронт-касса (H-3) подтвердила вживую: deposit 300 → listener кредитнул ledger 0→300.
 
 ---
 
@@ -310,15 +346,17 @@ node scripts/slot-calibrate.mjs         # точный расчёт RTP / кал
 
 ## 11. Что делать дальше (приоритет)
 
-1. **F-3: починить listener** (раздел 8) — депозит on-chain должен кредитовать ledger.
-   Доказать end-to-end: deposit on-chain → +баланс в ledger → играть → withdraw on-chain.
-2. **F-4: связать с игрой** — задеплоить под env, прогнать полный цикл «занёс крипту → сыграл → вывел».
-3. **Block G:** event bus (BullMQ/Redis) + подписчики (CRM/Risk/Reporting заглушки),
-   observability (структурные логи, traceId), тесты (unit ledger/PF обязательны), CI.
-4. **Frontend:** Next.js + wallet connect (wagmi) + SIWE-флоу + экран слота + verifier UI.
-   Это же — портфолио/демо для собеса.
-5. **Позже:** 243-ways слот 2-й игрой (доказать расширяемость фреймворка); RG-инструменты
-   в UI (демо знания регуляций); деплой на Sepolia.
+Бэкенд A–G и фронтенд H-0…H-10 **завершены**. Остаётся:
+
+1. **Публичный деплой (бесплатный):** контракты CHIP+Vault на Sepolia (газ из крана);
+   фронт на Vercel (free); бэк + Go-ledger + Postgres (Neon) + Redis (Upstash) на free-tier
+   (Render/Fly). Подводные камни: cold-start бесплатных бэков, два процесса (Nest+Go),
+   owner-ключ Vault в секретах, listener-cursor добирает блоки после сна. → даёт живую ссылку
+   + настоящий Etherscan для прозрачности tx (H-9 расцветает только на публичной сети).
+2. **PWA:** manifest + service worker (сейчас `/sw.js` → 404).
+3. **Полная мобильная навигация лобби:** sidebar/drawer/bottomnav из дизайна (в v1 упрощены).
+4. **2-я игра:** 243-ways слот — доказать расширяемость Game Engine.
+5. **RG-инструменты в UI** (демо знания регуляций) — лимиты, self-exclusion.
 
 ---
 

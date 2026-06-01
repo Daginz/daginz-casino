@@ -1,67 +1,138 @@
-# Casino (testnet, wallet-connect)
+# Daginz — provably-fair crypto casino (testnet)
 
-Crypto casino on a testnet. Players connect their own wallet (MetaMask) — no real money, no custody, no KYC.
-Учебный fullstack-проект: правильная архитектура, Web3, provably-fair.
+A full-stack crypto casino on a testnet. Players connect their own wallet
+(MetaMask) or a built-in demo wallet — **no real money, no custody, no KYC**.
+Every spin is **provably fair** (commit-reveal) and verifiable in the browser;
+every on-chain transaction is traceable to a public block explorer.
 
-> Архитектура и план: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Ресёрч-материалы — в `docs/`.
+> Built as a serious portfolio project: clean contracts-first architecture,
+> Web3 wallet auth (SIWE), a double-entry ledger, on-chain escrow, and a
+> pixel-faithful animated frontend.
 
-## Стек
+**Architecture deep-dive:** [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) ·
+**Full project doc:** [`docs/PROJECT.md`](docs/PROJECT.md) ·
+**Diagram:** [`docs/architecture.drawio`](docs/architecture.drawio)
 
-| Часть | Технология |
+---
+
+## What it does
+
+1. **Connect** — Sign-In With Ethereum (SIWE / EIP-4361). Your wallet address
+   *is* your account; no registration, no password.
+2. **Lobby** — A casino storefront: hero promos, searchable game catalogue,
+   categories (Slots / Instant / Table / Live). One game is live (the slot),
+   the rest are placeholders.
+3. **Cashier** — Mint test CHIP from a faucet, deposit it on-chain into an
+   escrow vault, and withdraw back to your wallet. Each transaction shows a
+   live step-by-step status (submitted → mined block → confirmed) with a link
+   to a third-party explorer.
+4. **Play** — A 3×3, 5-payline slot. Outcomes are drawn by a provably-fair
+   commit-reveal scheme; RTP is calibrated and published (~96%).
+5. **Verify** — Reveal the server seed and recompute the outcome **in your own
+   browser** — byte-for-byte identical to the backend. No trust required.
+
+## Tech stack
+
+| Layer | Technology |
 |---|---|
-| Backend | NestJS (модульный монолит, TypeScript strict) |
-| Wallet / Ledger | Go (отдельный сервис) |
-| Frontend | Next.js (App Router) + wagmi/viem |
-| Smart contracts | Solidity (Hardhat/Foundry), тестнет |
-| Данные | PostgreSQL + Redis (Docker Compose) |
-| Шина | BullMQ/Redis → Kafka/NATS (позже) |
+| Frontend | Next.js 15 (App Router, React 19), TypeScript strict, **Vanilla Extract**, TanStack Query, React Hook Form, Zod v4, wagmi / viem, framer-motion |
+| Backend | NestJS 11 (modular monolith), contracts-first, Symbol DI, Result-pattern, pino + traceId, BullMQ event bus |
+| Ledger | Go (hexagonal DDD, pgx) — double-entry ledger with idempotency |
+| Smart contracts | Solidity (Hardhat) — ERC-20 `ChipToken` + `CasinoVault` escrow |
+| Auth | SIWE (EIP-4361) → JWT |
+| Fairness | Commit-reveal (HMAC-SHA256 over serverSeed/clientSeed/nonce) |
+| Data | PostgreSQL + Redis (Docker Compose) |
+| Chain | Local Hardhat (dev) → Sepolia (testnet) |
 
-## Структура
+## Monorepo structure
 
 ```
 apps/
-  backend/        NestJS модульный монолит
-  wallet/         Go сервис (ledger)
-  frontend/       Next.js
-  contracts-evm/  Solidity (позже, Block F)
+  backend/        NestJS modular monolith (auth, game, wallet, onchain, provably-fair)
+  wallet/         Go ledger service (double-entry, idempotent)
+  frontend/       Next.js app (lobby + slot + cashier + verify)
+  contracts-evm/  Solidity (ChipToken, CasinoVault) + Hardhat
 packages/
-  contracts/      OpenAPI / общие типы
-  config/         общие пресеты
+  contracts/      shared TypeScript types / branded IDs
 infra/
-  docker-compose.yml
-docs/             архитектура + ресёрч
+  docker-compose.yml   Postgres + Redis
+docs/             architecture, diagram, regulatory research
 ```
 
-## Быстрый старт
+## Quick start (local)
+
+Prereqs: Node 22+, pnpm 10+, Go 1.22+, Docker.
 
 ```bash
-# 1. поднять инфраструктуру (Postgres + Redis)
+# 1. Infrastructure (Postgres + Redis)
 pnpm infra:up
 
-# 2. установить зависимости (JS)
+# 2. JS dependencies
 pnpm install
 
-# 3. скопировать env
-cp .env.example .env
+# 3. Smart contracts — start a local Hardhat node and deploy
+cd apps/contracts-evm
+npx hardhat node            # terminal 1 — local chain on :8545
+npx hardhat run scripts/deploy.ts --network localhost   # terminal 2
 
-# 4. запустить всё в dev-режиме
-pnpm dev
+# 4. Go ledger service (:4100)
+cd apps/wallet && go run ./cmd/server
+
+# 5. Backend (:4000) — reads .env for chain + DB config
+cd apps/backend && cp .env.example .env   # then fill in deployed addresses
+node --env-file=.env dist/main.js          # or: pnpm --filter @casino/backend dev
+
+# 6. Frontend (:3000)
+cd apps/frontend && cp .env.local.example .env.local
+pnpm --filter @casino/frontend dev
 ```
 
-> Запуск собранного backend: `node --env-file=.env dist/main.js` (Node 22 читает .env нативно).
-> Если порт 4000 занят «зомби»-процессом: `netstat -ano | grep :4000` → `taskkill /PID <pid> /F`.
+Services:
+- Frontend — http://localhost:3000
+- Backend — http://localhost:4000 (`/health`, Swagger at `/docs`)
+- Go ledger — http://localhost:4100 (`/health`)
+- Hardhat node — http://127.0.0.1:8545 (chainId 31337)
 
-Сервисы:
-- Backend: http://localhost:4000  (health: `/health`)
-- Wallet (Go): http://localhost:4100  (health: `/health`)
-- Frontend: http://localhost:3000
+**MetaMask on local Hardhat:** add a network with RPC `http://127.0.0.1:8545`,
+chain ID `31337`. The demo wallet works without any setup. Note: any chain —
+even local — charges gas, so a wallet needs test ETH to send transactions
+(the demo account is pre-funded).
 
-## Прогресс (блоки)
+## How the money flow works
 
-- [x] **A** — Архитектурный дизайн
-- [x] **B** — Фундамент монорепо + инфра
-- [x] **C** — Скелеты всех сервисов (контракты + заглушки)
-- [ ] **D** — Ядро: Auth → Wallet/Ledger → Provably-Fair  ← сейчас
-- [ ] **E** — Первая вертикаль Dice end-to-end
-- [ ] **F** — On-chain слой
-- [ ] **G** — Обвязка, тесты, observability
+```
+Faucet:   ChipToken.faucet()  →  +1000 CHIP in your wallet (on-chain)
+Deposit:  approve(vault) → vault.deposit()  →  Deposit event
+          →  backend listener credits the off-chain ledger  →  "casino balance"
+Play:     POST /game/play  →  ledger debits stake, credits payout
+Withdraw: POST /onchain/withdraw  →  backend (vault owner) releases CHIP on-chain
+```
+
+On-chain CHIP has 18 decimals; the ledger stores whole CHIP (integer minor
+units) — conversion happens at the on-chain boundary.
+
+## Provably fair
+
+```
+roundSeed = HMAC-SHA256(serverSeed, `${clientSeed}:${nonce}`)
+outcome   = parseInt(roundSeed.slice(0, 13), 16) / 2**52      // in [0, 1)
+```
+
+The server publishes `SHA-256(serverSeed)` *before* you play. After a reveal,
+the frontend recomputes the outcome with the Web Crypto API and confirms it
+matches — the same math the backend used, with no server trust.
+
+## Status
+
+Backend (auth, ledger, game engine, on-chain hybrid, observability) and the
+full frontend (lobby, slot, cashier, provably-fair verifier, transaction
+transparency) are complete and verified end-to-end against the running stack.
+
+Not yet done: PWA, public Sepolia deployment, a second game, full mobile
+lobby navigation.
+
+## Disclaimer
+
+Testnet only. Chips are valueless test tokens. This is **not** a real-money
+gambling service and is not operable as one — see the regulatory research in
+`docs/` for why offshore/crypto gambling is a legal minefield.

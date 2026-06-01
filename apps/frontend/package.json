@@ -2,7 +2,7 @@
   "name": "@casino/frontend",
   "version": "0.0.0",
   "private": true,
-  "description": "Casino frontend — Next.js + wagmi/viem",
+  "description": "Casino frontend — Next.js + wagmi/viem + Vanilla Extract",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
@@ -11,14 +11,26 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.4.0",
+    "@tanstack/react-query": "^5.62.0",
+    "@vanilla-extract/css": "^1.20.1",
+    "@vanilla-extract/dynamic": "^2.1.5",
+    "@vanilla-extract/recipes": "^0.5.7",
+    "framer-motion": "^11.15.0",
     "next": "^15.1.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-hook-form": "^7.55.0",
+    "siwe": "^3.0.0",
+    "viem": "^2.21.0",
+    "wagmi": "^2.14.0",
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@vanilla-extract/next-plugin": "^2.5.2",
     "typescript": "^5.7.3"
   }
 }
