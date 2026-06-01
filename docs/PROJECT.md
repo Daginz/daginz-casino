@@ -131,7 +131,17 @@ casino/
 | **D** | Ядро: Wallet/Ledger + SIWE auth + Provably-Fair | ✅ завершён |
 | **E** | Game Engine framework + слот (RTP калиброван) | ✅ завершён |
 | **F** | On-chain слой (контракты + listener + withdraw) | ✅ **завершён** (F-1..F-4, гибрид-цикл PASS) |
-| **G** | Обвязка, тесты, observability | 🔵 **в процессе** |
+| **G** | Обвязка, тесты, observability, event bus | ✅ **завершён** (G-1..G-4) |
+
+> **Block G итог:** 25 автотестов (22 jest backend: provably-fair + слот; 3 go: ledger) — регрессионная
+> защита на честность и деньги. CI (GitHub Actions): node + contracts + go параллельно на push/PR.
+> Structured logging (pino) с per-request traceId — один id в заголовке `x-trace-id`, error-envelope и
+> всех строках лога запроса. Event bus (BullMQ/Redis): producers (game/listener/withdraw) публикуют
+> 3 доменных события → ReportingSubscriber потребляет асинхронно (Risk/CRM по тому же образцу).
+>
+> **🎉 БЭКЕНД-ВЕРТИКАЛЬ A–G ПОЛНОСТЬЮ ГОТОВА.** Сквозной путь работает: подключить кошелёк (SIWE) →
+> депозит CHIP on-chain → listener кредитует ledger → слот (provably-fair, RTP 96%) → вывод CHIP on-chain.
+> Дальше: frontend (дизайн в Claude Design + интеграция), PWA, деплой на Sepolia.
 
 > **Block F итог — единая идентичность игрока = lowercased wallet address.**
 > `players.id` теперь TEXT PK (адрес); FK в `pf_seeds`/`game_rounds` — TEXT; JWT `sub` = адрес;
