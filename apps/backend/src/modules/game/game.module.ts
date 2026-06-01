@@ -11,6 +11,7 @@ import { GAME_REGISTRY, GameRegistry } from './engine/game-registry';
 import { GameEngineService } from './engine/game-engine.service';
 import { PostgresGameRoundDataProvider } from './providers/postgres-game-round.data-provider';
 import { SlotGame } from './games/slot/slot.game';
+import { Slot5x3Game } from './games/slot5x3/slot5x3.game';
 import { GameController } from './game.controller';
 
 /**
@@ -31,6 +32,7 @@ import { GameController } from './game.controller';
     { provide: GAME_REGISTRY, useClass: GameRegistry },
     { provide: GAME_ROUND_DATA_PROVIDER, useClass: PostgresGameRoundDataProvider },
     SlotGame,
+    Slot5x3Game,
     JwtAuthGuard,
   ],
   exports: [GameEngineService],
@@ -39,10 +41,12 @@ export class GameModule implements OnModuleInit {
   constructor(
     @Inject(GAME_REGISTRY) private readonly registry: GameRegistry,
     private readonly slot: SlotGame,
+    private readonly slot5x3: Slot5x3Game,
   ) {}
 
   onModuleInit(): void {
     // Register every game here — the only place a new game is wired in.
     this.registry.register(this.slot);
+    this.registry.register(this.slot5x3);
   }
 }

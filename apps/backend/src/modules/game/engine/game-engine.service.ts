@@ -96,6 +96,13 @@ export class GameEngineService {
       if (!win.ok) return err(win.error);
     }
 
+    // 4b. A game may award free spins (e.g. a scatter trigger). Credited to the
+    //     bonus profile — a promo grant, not a ledger movement.
+    const awarded = freeSpinsAwarded(result.detail);
+    if (awarded > 0) {
+      await this.bonus.grantFreeSpins(input.playerId, awarded);
+    }
+
     // 5. Persist round history.
     const stored = await this.rounds.save({
       playerId: input.playerId,
@@ -139,4 +146,17 @@ export class GameEngineService {
   listGames(): Array<{ id: string; displayName: string }> {
     return this.registry.list();
   }
+}
+
+/**
+ * Read an optional `freeSpinsAwarded` from a game's detail blob, generically.
+ * A game opts into free-spin grants just by putting this field in its detail
+ * (e.g. the 5×3 slot's scatter trigger); other games simply don't.
+ */
+function freeSpinsAwarded(detail: unknown): number {
+  if (detail && typeof detail === 'object' && 'freeSpinsAwarded' in detail) {
+    const v = (detail as { freeSpinsAwarded: unknown }).freeSpinsAwarded;
+    if (typeof v === 'number' && Number.isInteger(v) && v > 0) return v;
+  }
+  return 0;
 }
