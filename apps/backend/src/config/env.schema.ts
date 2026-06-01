@@ -20,6 +20,19 @@ export const envSchema = z.object({
 
   // Wallet (Go) service base URL — the backend calls it for ledger ops.
   WALLET_URL: z.string().url().default('http://localhost:4100'),
+
+  // ── On-chain listener (Block F) ───────────────────────────────────
+  // Enable the listener; off by default so the app boots without a chain.
+  ONCHAIN_ENABLED: z.coerce.boolean().default(false),
+  ONCHAIN_RPC_URL: z.string().url().default('http://127.0.0.1:8545'),
+  ONCHAIN_CHAIN_ID: z.coerce.number().int().positive().default(31337),
+  ONCHAIN_VAULT_ADDRESS: z.string().default(''),
+  ONCHAIN_CHIP_ADDRESS: z.string().default(''),
+  // Owner key that signs withdrawal txs (testnet only; never a real key here).
+  ONCHAIN_OWNER_KEY: z.string().default(''),
+  // Poll cadence + confirmations before crediting a deposit.
+  ONCHAIN_POLL_MS: z.coerce.number().int().positive().default(3000),
+  ONCHAIN_CONFIRMATIONS: z.coerce.number().int().nonnegative().default(1),
 });
 
 export type Env = z.infer<typeof envSchema>;

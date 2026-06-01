@@ -40,3 +40,7 @@ infra/.data/
 apps/contracts-evm/cache/
 apps/contracts-evm/artifacts/
 apps/contracts-evm/typechain-types/
+
+# local onchain env (contains testnet owner key)
+apps/backend/.env*
+!apps/backend/.env.example
