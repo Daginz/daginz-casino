@@ -130,8 +130,16 @@ casino/
 | **C** | Скелеты всех сервисов (контракты + заглушки) | ✅ завершён |
 | **D** | Ядро: Wallet/Ledger + SIWE auth + Provably-Fair | ✅ завершён |
 | **E** | Game Engine framework + слот (RTP калиброван) | ✅ завершён |
-| **F** | On-chain слой (контракты + listener) | 🔵 **в процессе** (F-1, F-2 ✅; F-3 в отладке) |
-| **G** | Обвязка, тесты, observability | ⬜ не начат |
+| **F** | On-chain слой (контракты + listener + withdraw) | ✅ **завершён** (F-1..F-4, гибрид-цикл PASS) |
+| **G** | Обвязка, тесты, observability | 🔵 **в процессе** |
+
+> **Block F итог — единая идентичность игрока = lowercased wallet address.**
+> `players.id` теперь TEXT PK (адрес); FK в `pf_seeds`/`game_rounds` — TEXT; JWT `sub` = адрес;
+> listener кредитует по адресу. Это убрало рассинхрон (депозит на адрес / ставка на UUID → 409,
+> затем UUID-FK → 500). Полный гибрид-цикл проверен `scripts/f4-cycle-smoke.mjs`:
+> deposit 500 on-chain → ledger 500 → 10×50 слот (won → ledger) → withdraw → on-chain +N → ledger 0. PASS.
+> Доп. фиксы: атомарная идемпотентность ledger (UNIQUE INSERT), guard от двойного запуска listener,
+> wei↔CHIP конвертация на границе.
 
 **Подзадачи на потом:** 243-ways слот как 2-я игра (доказать расширяемость фреймворка).
 
