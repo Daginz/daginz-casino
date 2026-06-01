@@ -5,7 +5,7 @@
 
 CREATE TABLE IF NOT EXISTS pf_seeds (
     id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    player_id        UUID        NOT NULL REFERENCES players(id),
+    player_id        TEXT        NOT NULL REFERENCES players(id),
     server_seed      TEXT        NOT NULL,
     server_seed_hash TEXT        NOT NULL,
     client_seed      TEXT        NOT NULL,

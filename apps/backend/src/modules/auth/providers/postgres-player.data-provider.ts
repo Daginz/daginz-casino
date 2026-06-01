@@ -7,8 +7,7 @@ import type { IPlayerDataProvider } from '@/contracts/data-providers/player-data
 import { PG_POOL } from '@/shared/db/db.module';
 
 interface PlayerRow {
-  id: string;
-  wallet_address: string;
+  id: string; // lowercased wallet address (the player's single identity)
   created_at: Date;
 }
 
@@ -17,20 +16,20 @@ export class PostgresPlayerDataProvider implements IPlayerDataProvider {
   constructor(@Inject(PG_POOL) private readonly pool: Pool) {}
 
   async upsertByAddress(address: WalletAddress): Promise<Player> {
-    const normalized = address.toLowerCase();
+    const id = address.toLowerCase();
     const { rows } = await this.pool.query<PlayerRow>(
-      `INSERT INTO players (wallet_address) VALUES ($1)
-       ON CONFLICT (wallet_address) DO UPDATE SET wallet_address = EXCLUDED.wallet_address
-       RETURNING id, wallet_address, created_at`,
-      [normalized],
+      `INSERT INTO players (id) VALUES ($1)
+       ON CONFLICT (id) DO UPDATE SET id = EXCLUDED.id
+       RETURNING id, created_at`,
+      [id],
     );
     return this.toDomain(this.requireRow(rows[0]));
   }
 
   async findById(id: string): Promise<Player | null> {
     const { rows } = await this.pool.query<PlayerRow>(
-      `SELECT id, wallet_address, created_at FROM players WHERE id = $1`,
-      [id],
+      `SELECT id, created_at FROM players WHERE id = $1`,
+      [id.toLowerCase()],
     );
     const row = rows[0];
     return row ? this.toDomain(row) : null;
@@ -42,9 +41,10 @@ export class PostgresPlayerDataProvider implements IPlayerDataProvider {
   }
 
   private toDomain(row: PlayerRow): Player {
+    // id and walletAddress are the same value now (the address).
     return {
       id: asPlayerId(row.id),
-      walletAddress: row.wallet_address as WalletAddress,
+      walletAddress: row.id as WalletAddress,
       createdAt: row.created_at,
     };
   }

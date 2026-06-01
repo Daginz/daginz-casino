@@ -70,7 +70,14 @@ export class AuthService implements IAuthService {
   }
 
   private async signToken(player: Player): Promise<string> {
-    const payload: JwtPayload = { sub: player.id, address: player.walletAddress };
+    // The ledger player id IS the lowercased wallet address — single identity
+    // source across auth, game (debit) and the on-chain listener (credit).
+    // The DB UUID (player.id) stays the players-table PK, but is NOT the ledger
+    // key. Using the address everywhere keeps deposits/bets/withdrawals aligned.
+    const payload: JwtPayload = {
+      sub: player.walletAddress.toLowerCase(),
+      address: player.walletAddress,
+    };
     return this.jwt.signAsync(payload);
   }
 }

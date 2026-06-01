@@ -4,7 +4,7 @@
 
 CREATE TABLE IF NOT EXISTS game_rounds (
     id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    player_id        UUID        NOT NULL REFERENCES players(id),
+    player_id        TEXT        NOT NULL REFERENCES players(id),
     game             TEXT        NOT NULL,
     stake            BIGINT      NOT NULL CHECK (stake >= 0),
     payout           BIGINT      NOT NULL CHECK (payout >= 0),
