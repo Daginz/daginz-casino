@@ -85,7 +85,10 @@ services:
       # Hardhat account #0 — the Vault owner/deployer (signs withdrawals).
       ONCHAIN_OWNER_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
       ONCHAIN_POLL_MS: "2000"
-      ONCHAIN_CONFIRMATIONS: "1"
+      # Local Hardhat mines a block only per tx, so requiring confirmations would
+      # strand the latest deposit block until the next tx. The local chain is
+      # final instantly (no reorgs), so 0 is correct here. Sepolia would use 1+.
+      ONCHAIN_CONFIRMATIONS: "0"
     ports:
       - "4000:4000"
     depends_on:

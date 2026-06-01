@@ -1,0 +1,14 @@
+{
+  "name": "@casino/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "End-to-end tests against the live testnet stack (docker compose up)",
+  "type": "module",
+  "scripts": {
+    "test": "node --test --test-concurrency=1 --test-reporter=spec \"tests/**/*.test.mjs\""
+  },
+  "dependencies": {
+    "siwe": "^3.0.0",
+    "viem": "^2.21.0"
+  }
+}
