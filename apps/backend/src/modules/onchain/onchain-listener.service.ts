@@ -17,6 +17,7 @@ import {
 import { privateKeyToAccount } from 'viem/accounts';
 import { asPlayerId } from '@casino/contracts';
 import { WALLET_SERVICE, type IWalletService } from '@/contracts/wallet.contract';
+import { EVENT_BUS, type IEventBus } from '@/contracts/events.contract';
 import {
   ONCHAIN_DATA_PROVIDER,
   type IOnchainDataProvider,
@@ -51,6 +52,7 @@ export class OnchainListenerService implements OnModuleInit, OnModuleDestroy {
   constructor(
     @Inject(WALLET_SERVICE) private readonly wallet: IWalletService,
     @Inject(ONCHAIN_DATA_PROVIDER) private readonly store: IOnchainDataProvider,
+    @Inject(EVENT_BUS) private readonly events: IEventBus,
   ) {
     this.vault = env.ONCHAIN_VAULT_ADDRESS as Address;
     this.publicClient = createPublicClient({ transport: http(env.ONCHAIN_RPC_URL) });
@@ -147,6 +149,13 @@ export class OnchainListenerService implements OnModuleInit, OnModuleDestroy {
     }
     await this.store.markDepositCredited(transactionHash, logIndex);
     this.logger.log(`credited deposit ${chip} CHIP to ${playerId}`);
+
+    await this.events.publish({
+      name: 'onchain.deposit.confirmed',
+      playerId,
+      chip: chip.toString(),
+      txHash: transactionHash,
+    });
   }
 
   /**

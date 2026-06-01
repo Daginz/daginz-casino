@@ -6,6 +6,7 @@ import {
   type IProvablyFairService,
 } from '@/contracts/provably-fair.contract';
 import { WALLET_SERVICE, type IWalletService } from '@/contracts/wallet.contract';
+import { EVENT_BUS, type IEventBus } from '@/contracts/events.contract';
 import {
   GAME_ROUND_DATA_PROVIDER,
   type IGameRoundDataProvider,
@@ -41,6 +42,7 @@ export class GameEngineService {
     @Inject(PROVABLY_FAIR_SERVICE) private readonly fair: IProvablyFairService,
     @Inject(WALLET_SERVICE) private readonly wallet: IWalletService,
     @Inject(GAME_ROUND_DATA_PROVIDER) private readonly rounds: IGameRoundDataProvider,
+    @Inject(EVENT_BUS) private readonly events: IEventBus,
   ) {}
 
   async play(input: PlayRoundInput): Promise<Result<StoredRound, DomainError>> {
@@ -94,6 +96,19 @@ export class GameEngineService {
       nonce: draw.value.nonce,
       detail: result.detail,
     });
+
+    // Publish after the round is committed — subscribers (reporting/risk/crm)
+    // react async without blocking the player's response.
+    await this.events.publish({
+      name: 'game.round.completed',
+      roundId: stored.id,
+      playerId: stored.playerId,
+      game: stored.game,
+      stake: stored.stake.toString(),
+      payout: stored.payout.toString(),
+      createdAt: stored.createdAt.toISOString(),
+    });
+
     return ok(stored);
   }
 
