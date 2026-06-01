@@ -1,8 +1,10 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { randomBytes } from 'node:crypto';
 import { keccak256, toHex, type Address } from 'viem';
 import type { PlayerId, WalletAddress } from '@casino/contracts';
 import { WALLET_SERVICE, type IWalletService } from '@/contracts/wallet.contract';
+import { EVENT_BUS, type IEventBus } from '@/contracts/events.contract';
 import { err, ok, type Result } from '@/shared/result';
 import {
   ExternalServiceError,
@@ -27,11 +29,11 @@ export interface WithdrawResult {
  */
 @Injectable()
 export class OnchainWithdrawService {
-  private readonly logger = new Logger(OnchainWithdrawService.name);
-
   constructor(
     @Inject(WALLET_SERVICE) private readonly wallet: IWalletService,
+    @Inject(EVENT_BUS) private readonly events: IEventBus,
     private readonly listener: OnchainListenerService,
+    private readonly logger: Logger,
   ) {}
 
   async withdraw(
@@ -63,6 +65,13 @@ export class OnchainWithdrawService {
         withdrawalId,
       );
       this.logger.log(`withdraw ${chipAmount} CHIP to ${address} tx=${txHash}`);
+      await this.events.publish({
+        name: 'onchain.withdraw.sent',
+        playerId,
+        chip: chipAmount.toString(),
+        txHash,
+        withdrawalId,
+      });
       return ok({ withdrawalId, txHash, chipAmount: chipAmount.toString() });
     } catch (cause) {
       this.logger.error(`on-chain withdraw failed, refunding ledger: ${String(cause)}`);
